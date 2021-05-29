@@ -1,6 +1,5 @@
 import bpy
 import os
-from bpy.types import NODE_UL_interface_sockets
 import mathutils
 from . import utils
 from . import nodeutils
@@ -80,6 +79,7 @@ def add_image_target(nodes, name, size, data = True, alpha = False):
     utils.log_info("Creating new image: " + name)
     return img
 
+
 #def copy_image_node(nodes, from_node, name):
 #    new_image = from_node.image.copy()
 #    new_image.file_format = "JPEG"
@@ -91,6 +91,7 @@ def add_image_target(nodes, name, size, data = True, alpha = False):
 #    image_node.name = BAKE_PREFIX + name
 #    image_node.select = True
 #    nodes.active = image_node
+
 
 def bake_target(source_mat, mat, source_node, source_socket, map_suffix, data):
     props = bpy.context.scene.CC3BakeProps
@@ -137,6 +138,7 @@ def bake_target(source_mat, mat, source_node, source_socket, map_suffix, data):
     loc[1] += 25
     image_node.location = loc
     return image_node
+
 
 def bake_shader_normal(source_mat, mat):
     props = bpy.context.scene.CC3BakeProps
@@ -216,7 +218,6 @@ def prep_diffuse(mat, shader_node):
             mat.shadow_method = 'NONE'
 
 
-
 def prep_ao(shader_node, ao_in_diffuse):
     props = bpy.context.scene.CC3BakeProps
 
@@ -253,6 +254,7 @@ def prep_ao(shader_node, ao_in_diffuse):
 
     return ao_node, ao_socket, ao_strength
 
+
 def prep_sss(shader_node):
     # determine SSS radius vector... somehow.
     sss_radius = mathutils.Vector((0.01, 0.01, 0.01)) # default to 1cm
@@ -272,6 +274,7 @@ def prep_sss(shader_node):
             sss_radius = nodeutils.get_node_input(shader_node, "Subsurface Radius", sss_radius)
 
     return sss_radius
+
 
 def prep_roughness(shader_node):
 
@@ -1211,7 +1214,6 @@ def revert_materials(objects):
                     obj.data.materials[i] = bc.source_material
 
 
-
 def restore_baked_materials(objects):
     for obj in objects:
         if obj.type == "MESH":
@@ -1251,6 +1253,7 @@ class CC3Baker(bpy.types.Operator):
         if properties.param == "BAKE":
             return "Bake Textures..."
         return ""
+
 
 class CC3BakeSettings(bpy.types.Operator):
     """Bake Settings"""
@@ -1309,6 +1312,7 @@ JPEGIFY_FORMATS = [
     "TARGA_RAW",
     "TIFF",
 ]
+
 
 class CC3Jpegify(bpy.types.Operator):
     """Jpegifyer"""
@@ -1420,7 +1424,6 @@ class CC3BakePanel(bpy.types.Panel):
             if "MicroNormalMask" in bake_maps:
                 col_1.label(text="Micro Normal Mask Size")
                 col_2.prop(props, "mask_size", text="")
-
 
     def draw(self, context):
         props = bpy.context.scene.CC3BakeProps
@@ -1542,6 +1545,7 @@ class CC3BakeCache(bpy.types.PropertyGroup):
     source_material: bpy.props.PointerProperty(type=bpy.types.Material)
     baked_material: bpy.props.PointerProperty(type=bpy.types.Material)
 
+
 class CC3BakeMaterialSettings(bpy.types.PropertyGroup):
     material: bpy.props.PointerProperty(type=bpy.types.Material)
     max_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
@@ -1562,7 +1566,6 @@ class CC3BakeMaterialSettings(bpy.types.PropertyGroup):
 
 
 class CC3BakeProps(bpy.types.PropertyGroup):
-
     auto_increment: bpy.props.IntProperty(default=100)
     jpeg_quality: bpy.props.IntProperty(default=90, min=0, max=100)
     png_compression: bpy.props.IntProperty(default=15, min=0, max=100)
@@ -1612,3 +1615,4 @@ class MATERIAL_UL_weightedmatslots(bpy.types.UIList):
         elif self.layout_type == 'GRID':
             layout.alignment = 'CENTER'
             layout.label(text="", icon_value=icon)
+

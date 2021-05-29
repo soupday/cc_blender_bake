@@ -6,7 +6,7 @@ NO_SIZE = 64
 DEFAULT_SIZE = 1024
 
 BAKE_TARGETS = [
-    ("BLENDER","Blender", "To Blenders!"),
+    ("BLENDER","Blender", "To Blenders, already Blenders?!"),
     ("SKETCHFAB","Sketchfab", "To sketchfabs!"),
     ("GLTF","GLTF", "Bake for .GLTF exports!"),
     ("UNITY_HDRP","Unity HDRP","To unities HDRP!"),
@@ -15,7 +15,7 @@ BAKE_TARGETS = [
 
 TARGET_FORMATS = [
     ("PNG","PNG", "Bake textures to PNG Format."),
-    ("JPEG","JPEG", "Bake texture to JPEG Format."),
+    ("JPEG","JPEG", "Bake textures to JPEG Format."),
 ]
 
 CONVERSION_FUNCTIONS = [

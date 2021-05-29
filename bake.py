@@ -5,7 +5,7 @@ import mathutils
 from . import utils
 from . import nodeutils
 from . import cc3
-from .vars import *
+from . import vars
 
 
 def make_new_image(name, size, format, ext, dir, data, alpha):
@@ -104,7 +104,7 @@ def bake_target(source_mat, mat, source_node, source_socket, map_suffix, data):
     size = get_target_map_size(source_mat, map_suffix)
     image = add_image_target(nodes, mat_name + "_" + target_suffix, size, data)
     image_node = nodeutils.make_image_node(nodes, image)
-    image_node.name = BAKE_PREFIX + mat_name + "_" + map_suffix
+    image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
     image_node.select = True
     nodes.active = image_node
     bpy.context.scene.cycles.samples = props.bake_samples
@@ -150,7 +150,7 @@ def bake_shader_normal(source_mat, mat):
     size = get_target_map_size(source_mat, "Normal")
     image = add_image_target(nodes, mat_name + "_Normal", size, True)
     image_node = nodeutils.make_image_node(nodes, image)
-    image_node.name = BAKE_PREFIX + mat_name + "_Normal"
+    image_node.name = vars.BAKE_PREFIX + mat_name + "_Normal"
     image_node.select = True
     nodes.active = image_node
 
@@ -305,7 +305,7 @@ def bake_material(obj, mat, source_mat):
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
     shader_node = nodeutils.get_shader_node(nodes)
-    bake_maps = get_bake_target_maps(props.target_mode)
+    bake_maps = vars.get_bake_target_maps(props.target_mode)
 
     utils.log_info("Baking for " + props.target_mode + ": " + obj.name + " / " + mat.name)
 
@@ -500,7 +500,7 @@ def combine_diffuse_tex(nodes, source_mat, mat, diffuse_node, alpha_node):
     size = get_target_map_size(source_mat, map_suffix)
     image = add_image_target(nodes, mat_name + "_" + target_suffix, size, True, True)
     image_node = nodeutils.make_image_node(nodes, image)
-    image_node.name = BAKE_PREFIX + mat_name + "_" + map_suffix
+    image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
     image_node.select = True
     nodes.active = image_node
     # writeable list copy for fastest write speed
@@ -562,7 +562,7 @@ def combine_hdrp_mask_tex(nodes, source_mat, mat, metallic_node, ao_node, mask_n
     size = get_target_map_size(source_mat, map_suffix)
     image = add_image_target(nodes, mat_name + "_" + target_suffix, size, True, True)
     image_node = nodeutils.make_image_node(nodes, image)
-    image_node.name = BAKE_PREFIX + mat_name + "_" + map_suffix
+    image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
     image_node.select = True
     nodes.active = image_node
     image_data = list(image.pixels)
@@ -631,7 +631,7 @@ def combine_hdrp_detail_tex(nodes, source_mat, mat, detail_normal_node):
     size = get_target_map_size(source_mat, map_suffix)
     image = add_image_target(nodes, mat_name + "_" + target_suffix, size, True, True)
     image_node = nodeutils.make_image_node(nodes, image)
-    image_node.name = BAKE_PREFIX + mat_name + "_" + map_suffix
+    image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
     image_node.select = True
     nodes.active = image_node
     image_data = list(image.pixels)
@@ -691,7 +691,7 @@ def make_smoothness_tex(nodes, source_mat, mat, roughness_node):
     size = get_target_map_size(source_mat, map_suffix)
     image = add_image_target(nodes, mat_name + "_" + target_suffix, size, True, False)
     image_node = nodeutils.make_image_node(nodes, image)
-    image_node.name = BAKE_PREFIX + mat_name + "_" + map_suffix
+    image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
     image_node.select = True
     nodes.active = image_node
     image_data = list(image.pixels)
@@ -755,7 +755,7 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance):
 
     for node in nodes:
         if node != shader_node and node != output_node:
-            if BAKE_PREFIX in node.name:
+            if vars.BAKE_PREFIX in node.name:
                 if node.name.endswith("_Diffuse"):
                     diffuse_node = node
                 elif node.name.endswith("_AO"):
@@ -897,7 +897,7 @@ def next_uid():
 def get_target_map(suffix):
     props = bpy.context.scene.CC3BakeProps
 
-    bake_maps = get_bake_target_maps(props.target_mode)
+    bake_maps = vars.get_bake_target_maps(props.target_mode)
 
     if suffix in bake_maps:
         return bake_maps[suffix]
@@ -974,7 +974,7 @@ def get_max_texture_size(mat, tex_list, input_list):
     then falls back to finding the largest texture connected to the given list of inputs to the BSDF shader
     """
     if mat is None or mat.node_tree is None or mat.node_tree.nodes is None:
-        return NO_SIZE
+        return vars.NO_SIZE
 
     max_size = 0
     mat_cache = cc3.get_material_cache(mat)
@@ -1003,8 +1003,8 @@ def get_max_texture_size(mat, tex_list, input_list):
 
     # here we can override the result based on the mat_cache.material_type and the looked for tex_list
     if mat_cache is not None:
-        if mat_cache.material_type in TEX_SIZE_OVERRIDE:
-            mat_overrides = TEX_SIZE_OVERRIDE[mat_cache.material_type]
+        if mat_cache.material_type in vars.TEX_SIZE_OVERRIDE:
+            mat_overrides = vars.TEX_SIZE_OVERRIDE[mat_cache.material_type]
             for t in tex_list:
                 if t in mat_overrides:
                     print("DEBUG: Overriding size for material: " + mat.name + " texture: " + t + " size: " + str(mat_overrides[t]))
@@ -1013,7 +1013,7 @@ def get_max_texture_size(mat, tex_list, input_list):
                         max_size = size
 
     if max_size == 0:
-        max_size = NO_SIZE
+        max_size = vars.NO_SIZE
 
     return max_size
 
@@ -1025,14 +1025,14 @@ def detect_size_from_suffix(mat, suffix):
     target_map = get_target_map(suffix)
     if target_map:
         target_size = target_map[1]
-        if target_size in TEX_SIZE_DETECT:
-            tex_size_detect = TEX_SIZE_DETECT[target_size]
+        if target_size in vars.TEX_SIZE_DETECT:
+            tex_size_detect = vars.TEX_SIZE_DETECT[target_size]
             tex_list = tex_size_detect[0]
             input_list = tex_size_detect[1]
             return get_max_texture_size(mat, tex_list, input_list)
 
     # otherwise just return the default of 1024
-    return DEFAULT_SIZE
+    return vars.DEFAULT_SIZE
 
 
 def get_target_map_size(mat, suffix):
@@ -1048,7 +1048,7 @@ def get_target_map_size(mat, suffix):
     max_size = int(props.max_size)
 
     # if overriding with custom sizes:
-    bake_maps = get_bake_target_maps(props.target_mode)
+    bake_maps = vars.get_bake_target_maps(props.target_mode)
     if props.custom_sizes:
         if suffix in bake_maps:
             size = get_int_prop_by_name(p, bake_maps[suffix][1])
@@ -1464,7 +1464,7 @@ class CC3BakePanel(bpy.types.Panel):
         obj = context.object
         mat = context_material(context)
         bake_cache = get_bake_cache(mat)
-        bake_maps = get_bake_target_maps(props.target_mode)
+        bake_maps = vars.get_bake_target_maps(props.target_mode)
 
         if props.custom_sizes:
 
@@ -1544,21 +1544,21 @@ class CC3BakeCache(bpy.types.PropertyGroup):
 
 class CC3BakeMaterialSettings(bpy.types.PropertyGroup):
     material: bpy.props.PointerProperty(type=bpy.types.Material)
-    max_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    diffuse_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    ao_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    sss_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    transmission_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    thickness_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    metallic_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    specular_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    roughness_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    emissive_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    alpha_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    normal_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    bump_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    mask_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    detail_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
+    max_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    diffuse_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    ao_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    sss_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    transmission_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    thickness_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    metallic_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    specular_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    roughness_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    emissive_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    alpha_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    normal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    bump_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    mask_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    detail_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
 
 
 class CC3BakeProps(bpy.types.PropertyGroup):
@@ -1567,33 +1567,33 @@ class CC3BakeProps(bpy.types.PropertyGroup):
     jpeg_quality: bpy.props.IntProperty(default=90, min=0, max=100)
     png_compression: bpy.props.IntProperty(default=15, min=0, max=100)
 
-    target_mode: bpy.props.EnumProperty(items=BAKE_TARGETS, default="BLENDER")
+    target_mode: bpy.props.EnumProperty(items=vars.BAKE_TARGETS, default="BLENDER")
 
-    target_format: bpy.props.EnumProperty(items=TARGET_FORMATS, default="JPEG")
+    target_format: bpy.props.EnumProperty(items=vars.TARGET_FORMATS, default="JPEG")
 
     bake_samples: bpy.props.IntProperty(default=5, min=1, max=16)
     ao_in_diffuse: bpy.props.FloatProperty(default=0, min=0, max=1, description="How much of the ambient occlusion to bake into the diffuse.")
 
-    smoothness_mapping: bpy.props.EnumProperty(items=CONVERSION_FUNCTIONS, default="IR", description="Roughness to smoothness calculation.")
+    smoothness_mapping: bpy.props.EnumProperty(items=vars.CONVERSION_FUNCTIONS, default="IR", description="Roughness to smoothness calculation.")
 
     allow_bump_maps: bpy.props.BoolProperty(default=True)
 
     custom_sizes: bpy.props.BoolProperty(default=False)
-    max_size: bpy.props.EnumProperty(items=TEX_LIST, default="4096")
-    diffuse_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    ao_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    sss_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    transmission_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    thickness_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    metallic_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    specular_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    roughness_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    emissive_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    alpha_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    normal_size: bpy.props.EnumProperty(items=TEX_LIST, default="2048")
-    bump_size: bpy.props.EnumProperty(items=TEX_LIST, default="2048")
-    mask_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
-    detail_size: bpy.props.EnumProperty(items=TEX_LIST, default="1024")
+    max_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="4096")
+    diffuse_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    ao_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    sss_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    transmission_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    thickness_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    metallic_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    specular_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    roughness_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    emissive_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    alpha_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    normal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
+    bump_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
+    mask_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    detail_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
 
     bake_path: bpy.props.StringProperty(default="Bake", subtype="DIR_PATH")
     material_settings: bpy.props.CollectionProperty(type=CC3BakeMaterialSettings)

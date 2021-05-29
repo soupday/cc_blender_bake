@@ -29,7 +29,9 @@ bl_info = {
 
 CLASSES = (bake.CC3BakeCache, bake.CC3BakeSettings, bake.CC3BakeMaterialSettings,
             bake.CC3BakeProps, bake.CC3Baker, bake.CC3Jpegify, bake.CC3BakePanel, bake.CC3BakeUtilityPanel,
-            bake.MATERIAL_UL_weightedmatslots)
+            bake.MATERIAL_UL_weightedmatslots,
+            nodeutils.CC3NodeCoord
+            )
 
 def register():
     addon_updater_ops.register(bl_info)
@@ -87,3 +89,5 @@ class CC3BakeAddonPreferences(bpy.types.AddonPreferences):
 
     def draw(self, context):
         addon_updater_ops.update_settings_ui(self,context)
+
+

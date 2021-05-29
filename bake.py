@@ -76,7 +76,7 @@ def add_image_target(nodes, name, size, data = True, alpha = False):
     # or just make a new one:
     img = make_new_image(name, size, format, ext, path, data, alpha)
 
-    utils.log_info("Creating new image: " + name)
+    utils.log_info("Creating new image: " + name + " size: " + str(size))
     return img
 
 
@@ -205,17 +205,18 @@ def prep_diffuse(mat, shader_node):
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
 
-    # refractive eyes have transmission mixed into the cornea diffuse, so connect the eye diffuse which doesn't:
-    input_node = nodeutils.get_node_connected_to_input(shader_node, "Base Color")
-    input_socket = nodeutils.get_socket_connected_to_input(shader_node, "Base Color")
-    if input_socket is not None and input_socket == "Cornea Base Color":
-        nodeutils.link_nodes(links, input_node, "Eye Base Color", shader_node, "Base Color")
-        # connect the inverted iris mask to the alpha node to make the cornea transparent...
-        iris_mask_node = nodeutils.get_node_by_id(nodes, "(iris_mask)")
-        if iris_mask_node:
-            nodeutils.link_nodes(links, iris_mask_node, "Inverted Mask", shader_node, "Alpha")
-            mat.blend_method = 'BLEND'
-            mat.shadow_method = 'NONE'
+    if props.target_mode != "BLENDER":
+        # refractive eyes have transmission mixed into the cornea diffuse, so connect the eye diffuse which doesn't:
+        input_node = nodeutils.get_node_connected_to_input(shader_node, "Base Color")
+        input_socket = nodeutils.get_socket_connected_to_input(shader_node, "Base Color")
+        if input_socket is not None and input_socket == "Cornea Base Color":
+            nodeutils.link_nodes(links, input_node, "Eye Base Color", shader_node, "Base Color")
+            # connect the inverted iris mask to the alpha node to make the cornea transparent...
+            iris_mask_node = nodeutils.get_node_by_id(nodes, "(iris_mask)")
+            if iris_mask_node:
+                nodeutils.link_nodes(links, iris_mask_node, "Inverted Mask", shader_node, "Alpha")
+                mat.blend_method = 'BLEND'
+                mat.shadow_method = 'NONE'
 
 
 def prep_ao(shader_node, ao_in_diffuse):
@@ -320,6 +321,7 @@ def bake_material(obj, mat, source_mat):
     ao_node = ao_socket = ao_strength = ao_bake_node = None
     if "AO" in bake_maps:
         ao_node, ao_socket, ao_strength = prep_ao(shader_node, props.ao_in_diffuse)
+        utils.log_info("AO Strength: " + str(ao_strength))
     else:
         prep_ao(shader_node, 1.0)
     if "Diffuse" in bake_maps:
@@ -333,6 +335,7 @@ def bake_material(obj, mat, source_mat):
     sss_bake_node = None
     if "Subsurface" in bake_maps:
         sss_radius = prep_sss(shader_node)
+        utils.log_info("Subsurface Radius: " + str(sss_radius))
         sss_bake_node = bake_socket_input(source_mat, mat, shader_node, "Subsurface", "Subsurface")
 
     # Thickness Maps (Subsurface transmission)
@@ -382,6 +385,8 @@ def bake_material(obj, mat, source_mat):
     bump_bake_node = None
     bump_to_normal = False
     bump_distance = 1.0
+    micro_normal_strength = 1
+    micro_normal_tiling = 20
     if "Bump" not in bake_maps or not props.allow_bump_maps:
         bump_to_normal = True
     if "Normal" in bake_maps:
@@ -404,21 +409,26 @@ def bake_material(obj, mat, source_mat):
                     if height_node:
                         bump_bake_node = bake_socket_input(source_mat, mat, input_node, "Height", "Bump")
                         bump_distance = nodeutils.get_node_input(input_node, "Distance", 1.0)
+                        utils.log_info("Bump Map Distance: " + str(bump_distance))
             elif input_node.type == "GROUP" and "(normal_" in input_node.name and "_mixer)" in input_node.name:
                 if not bump_to_normal and "fake_bump_mixer" in input_node.node_tree.name:
                     # just bake the faked height map output of the fake_bump_mixer
                     bump_bake_node = bake_socket_output(source_mat, mat, input_node, "Height", "Bump")
                     bump_distance = nodeutils.get_node_input(input_node, "Bump Map Height", 1.0)
+                    utils.log_info("Bump Map Distance: " + str(bump_distance))
                 elif not bump_to_normal and "bump_mixer" in input_node.node_tree.name:
                     # just bake the height map input to the bump_mixer
                     bump_bake_node = bake_socket_input(source_mat, mat, input_node, "Bump Map", "Bump")
                     bump_distance = nodeutils.get_node_input(input_node, "Bump Map Height", 1.0)
+                    utils.log_info("Bump Map Distance: " + str(bump_distance))
                 else:
                     # connect the blend normal to the normal and bake shader normals
                     utils.log_info("Baking Blend Normal...")
                     nodeutils.link_nodes(links, input_node, "Blend Normal", shader_node, "Normal")
                     normal_bake_node = bake_shader_normal(source_mat, mat)
                     # now do the micro normals...
+                    micro_normal_strength = nodeutils.get_node_input(input_node, "Micro Normal Strength", 1)
+                    utils.log_info("Micro Normal Strength: " + str(micro_normal_strength))
             else:
                 # something is plugged into the normals, but can't tell what, so just bake the shader normals
                 normal_bake_node = bake_shader_normal(source_mat, mat)
@@ -428,7 +438,11 @@ def bake_material(obj, mat, source_mat):
     micronormal_node = None
     if "MicroNormal" in bake_maps:
         micronormal_node = nodeutils.find_image_node(nodes, "micro_normal_tex", "")
-        # disconnect any mapping nodes before baking the micro normal...
+        tiling_node = nodeutils.get_node_connected_to_input(micronormal_node, "Vector")
+        if tiling_node:
+            micro_normal_tiling = nodeutils.get_node_input(tiling_node, "Tiling", 20)
+            utils.log_info("Micro Normal Tiling: " + str(micro_normal_tiling))
+            # disconnect any tiling/mapping nodes before baking the micro normal...
         nodeutils.unlink_node(links, micronormal_node, "Vector")
         if micronormal_node:
             micronormal_bake_node = bake_socket_output(source_mat, mat, micronormal_node, "Color", "MicroNormal")
@@ -439,7 +453,7 @@ def bake_material(obj, mat, source_mat):
     if "MicroNormalMask" in bake_maps:
         micronormalmask_node = nodeutils.find_image_node(nodes, "micro_normal_mask_tex", "")
         if micronormalmask_node:
-            micronormalmask_bake_node = bake_socket_output(source_mat, mat, micronormalmask_node, "Color", "DetailMask")
+            micronormalmask_bake_node = bake_socket_output(source_mat, mat, micronormalmask_node, "Color", "MicroNormalMask")
 
     # Post processing
     #
@@ -474,7 +488,7 @@ def bake_material(obj, mat, source_mat):
 
     # reconnect the materials
 
-    reconnect_material(mat, ao_strength, sss_radius, bump_distance)
+    reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal_strength, micro_normal_tiling)
 
 
 def combine_diffuse_tex(nodes, source_mat, mat, diffuse_node, alpha_node):
@@ -730,7 +744,7 @@ def make_smoothness_tex(nodes, source_mat, mat, roughness_node):
     image.save()
 
 
-def reconnect_material(mat, ao_strength, sss_radius, bump_distance):
+def reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal_strength, micro_normal_tiling):
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
     shader_node = nodeutils.get_shader_node(nodes)
@@ -755,6 +769,11 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance):
     normal_map_node = None
     micronormal_node = None
     micronormalmask_node = None
+
+    micro_mix_node = None
+    micro_mapping_node = None
+    micro_texcoord_node = None
+    micro_mask_mult_node = None
 
     for node in nodes:
         if node != shader_node and node != output_node:
@@ -783,7 +802,7 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance):
                     normal_node = node
                 elif node.name.endswith("_MicroNormal"):
                     micronormal_node = node
-                elif node.name.endswith("_MicrroNormalMask"):
+                elif node.name.endswith("_MicroNormalMask"):
                     micronormalmask_node = node
                 elif node.name.endswith("_Bump"):
                     bump_node = node
@@ -830,6 +849,26 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance):
         nodeutils.link_nodes(links, bump_map_node, "Normal", shader_node, "Normal")
         nodeutils.set_node_input(bump_map_node, "Distance", bump_distance)
 
+    if micronormal_node:
+        if normal_map_node is None:
+            normal_map_node = nodeutils.make_shader_node(nodes, "ShaderNodeNormalMap")
+            nodeutils.link_nodes(links, normal_map_node, "Normal", shader_node, "Normal")
+        micro_mix_node = nodeutils.make_mixrgb_node(nodes, "OVERLAY")
+        micro_mapping_node = nodeutils.make_shader_node(nodes, "ShaderNodeMapping")
+        micro_texcoord_node = nodeutils.make_shader_node(nodes, "ShaderNodeTexCoord")
+        nodeutils.set_node_input(micro_mix_node, "Fac", micro_normal_strength)
+        nodeutils.link_nodes(links, micro_texcoord_node, "UV", micro_mapping_node, "Vector")
+        nodeutils.link_nodes(links, micro_mapping_node, "Vector", micronormal_node, "Vector")
+        nodeutils.set_node_input(micro_mapping_node, "Scale", (micro_normal_tiling, micro_normal_tiling, 1))
+        if micronormalmask_node:
+            micro_mask_mult_node = nodeutils.make_math_node(nodes, "MULTIPLY", 1, micro_normal_strength)
+            nodeutils.link_nodes(links, micronormalmask_node, "Color", micro_mask_mult_node, 0)
+            nodeutils.link_nodes(links, micro_mask_mult_node, "Value", micro_mix_node, "Fac")
+        if normal_node:
+            nodeutils.link_nodes(links, normal_node, "Color", micro_mix_node, "Color1")
+        nodeutils.link_nodes(links, micronormal_node, "Color", micro_mix_node, "Color2")
+        nodeutils.link_nodes(links, micro_mix_node, "Color", normal_map_node, "Color")
+
     position(diffuse_node, (-600, 600))
     position(ao_node, (-900, 600))
     position(mix_node, (-300, 600))
@@ -845,10 +884,17 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance):
     position(emission_node, (-900, -300))
     position(alpha_node, (-600, -300))
 
-    position(normal_node, (-600, -600))
+    position(normal_node, (-900, -600))
     position(normal_map_node, (-300, -600))
-    position(bump_node, (-600, -600))
+    position(bump_node, (-900, -600))
     position(bump_map_node, (-300, -600))
+    position(micronormalmask_node, (-1200, -600))
+    position(micronormal_node, (-1500, -600))
+
+    position(micro_mix_node, (-470,-690))
+    position(micro_mapping_node, (-1710,-600))
+    position(micro_texcoord_node, (-1890,-600))
+    position(micro_mask_mult_node, (-640,-600))
 
 
 def bake_selected_objects():
@@ -982,16 +1028,12 @@ def get_max_texture_size(mat, tex_list, input_list):
     max_size = 0
     mat_cache = cc3.get_material_cache(mat)
 
-    print("DEBUG: mat: " + mat.name)
-    print("DEBUG: tex_list: " + str(tex_list))
-    print("DEBUG: input_list: " + str(input_list))
-
     if mat_cache is not None and tex_list is not None:
         for t in tex_list:
             tex_node = cc3.get_cc3_tex(mat, t)
             if tex_node is not None:
                 size = utils.get_tex_image_size(tex_node)
-                print("DEBUG: Found CC3 texture: " + t + " size: " + str(size))
+                utils.log_info("Found CC3 texture: " + t + " size: " + str(size))
                 if size > max_size:
                     max_size = size
 
@@ -1000,7 +1042,7 @@ def get_max_texture_size(mat, tex_list, input_list):
         max_size = 0
         for i in input_list:
             size = get_largest_texture_to_socket(shader, i)
-            print("DEBUG: Found largest input texture: " + i + " size: " + str(size))
+            utils.log_info("Found largest input texture: " + i + " size: " + str(size))
             if size > max_size:
                 max_size = size
 
@@ -1010,7 +1052,7 @@ def get_max_texture_size(mat, tex_list, input_list):
             mat_overrides = vars.TEX_SIZE_OVERRIDE[mat_cache.material_type]
             for t in tex_list:
                 if t in mat_overrides:
-                    print("DEBUG: Overriding size for material: " + mat.name + " texture: " + t + " size: " + str(mat_overrides[t]))
+                    utils.log_info("Overriding size for material: " + mat.name + " texture: " + t + " size: " + str(mat_overrides[t]))
                     size = mat_overrides[t]
                     if size > max_size:
                         max_size = size
@@ -1420,10 +1462,10 @@ class CC3BakePanel(bpy.types.Panel):
                 col_2.prop(props, "bump_size", text="")
             if "MicroNormal" in bake_maps:
                 col_1.label(text="Micro Normal Size")
-                col_2.prop(props, "detail_size", text="")
+                col_2.prop(props, "micronormal_size", text="")
             if "MicroNormalMask" in bake_maps:
                 col_1.label(text="Micro Normal Mask Size")
-                col_2.prop(props, "mask_size", text="")
+                col_2.prop(props, "micronormalmask_size", text="")
 
     def draw(self, context):
         props = bpy.context.scene.CC3BakeProps
@@ -1453,7 +1495,7 @@ class CC3BakePanel(bpy.types.Panel):
         col_2.prop(props, "allow_bump_maps", text="", slider = True)
         col_1.label(text="AO in Diffuse")
         col_2.prop(props, "ao_in_diffuse", text="", slider = True)
-        if props.target_mode == "UNITY_HDRP":
+        if props.target_mode == "UNITY_HDRP" or props.target_mode == "UNITY_URP":
             col_1.label(text="Smoothness Mapping")
             col_2.prop(props, "smoothness_mapping", text="", slider = True)
         col_1.label(text="Bake Folder")
@@ -1548,7 +1590,7 @@ class CC3BakeCache(bpy.types.PropertyGroup):
 
 class CC3BakeMaterialSettings(bpy.types.PropertyGroup):
     material: bpy.props.PointerProperty(type=bpy.types.Material)
-    max_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    max_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="4096")
     diffuse_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
     ao_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
     sss_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
@@ -1559,8 +1601,10 @@ class CC3BakeMaterialSettings(bpy.types.PropertyGroup):
     roughness_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
     emissive_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
     alpha_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
-    normal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
-    bump_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    normal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
+    micronormal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    micronormalmask_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    bump_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     mask_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
     detail_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
 
@@ -1594,6 +1638,8 @@ class CC3BakeProps(bpy.types.PropertyGroup):
     emissive_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
     alpha_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
     normal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
+    micronormal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
+    micronormalmask_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
     bump_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     mask_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
     detail_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")

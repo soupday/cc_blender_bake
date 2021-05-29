@@ -51,8 +51,8 @@ BLENDER_MAPS = {
     "Transmission": ["Transmission", "transmission_size"],
     "Normal": ["Normal", "normal_size"],
     "Bump": ["Bump", "bump_size"],
-    "MicroNormal": ["MicroNormal", "detail_size"],
-    "MicroNormalMask": ["MicroNormalMask", "mask_size"],
+    "MicroNormal": ["MicroNormal", "micronormal_size"],
+    "MicroNormalMask": ["MicroNormalMask", "micronormalmask_size"],
 }
 
 SKETCHFAB_MAPS = {
@@ -181,8 +181,12 @@ TEX_SIZE_DETECT = {
         ["micro_normal_tex"], None
     ],
 
-    "mask_size": [
+    "micronormalmask_size": [
         ["micro_normal_mask_tex"], None
+    ],
+
+    "micronormal_size": [
+        ["micro_normal_tex"], None
     ],
 
     "mask_size": [

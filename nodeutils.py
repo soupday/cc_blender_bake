@@ -138,6 +138,13 @@ def make_mixrgb_node(nodes, blend_type):
     mix_node.blend_type = blend_type
     return mix_node
 
+def make_math_node(nodes, operation, value1 = 0.5, value2 = 0.5):
+    math_node = make_shader_node(nodes, "ShaderNodeMath")
+    math_node.operation = operation
+    math_node.inputs[0].default_value = value1
+    math_node.inputs[1].default_value = value2
+    return math_node
+
 def find_image_node(nodes, name_search, file_search):
     for node in nodes:
         if node.type == "TEX_IMAGE":
@@ -156,3 +163,20 @@ def make_image_node(nodes, image):
     image_node = make_shader_node(nodes, "ShaderNodeTexImage")
     image_node.image = image
     return image_node
+
+
+# class to show node coords in shader editor...
+class CC3NodeCoord(bpy.types.Panel):
+    bl_label = "Node Coordinates panel"
+    bl_idname = "CC3I_PT_NodeCoord"
+    bl_space_type = "NODE_EDITOR"
+    bl_region_type = "UI"
+
+    def draw(self, context):
+        if context.active_node is not None:
+            layout = self.layout
+            layout.separator()
+            row = layout.box().row()
+            coords = context.active_node.location
+            row.label(text=str(int(coords.x/10)*10) + ", " + str(int(coords.y/10)*10))
+            row.label(text=str(int(coords.x)) + ", " + str(int(coords.y)))

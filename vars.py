@@ -41,7 +41,7 @@ def get_bake_target_maps(target):
 # global_suffix: ['target_suffix', 'prop_name']
 BLENDER_MAPS = {
     "Diffuse": ["Diffuse", "diffuse_size"],
-    "AO": ["AO", "ao_size"],
+    #"AO": ["AO", "ao_size"],
     "Subsurface": ["Subsurface", "sss_size"],
     "Metallic": ["Metallic", "metallic_size"],
     "Specular": ["Specular", "specular_size"],

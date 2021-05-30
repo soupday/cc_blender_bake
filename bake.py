@@ -18,6 +18,22 @@ def make_new_image(name, size, format, ext, dir, data, alpha):
     return img
 
 
+def get_image_format():
+    props = bpy.context.scene.CC3BakeProps
+    format = props.target_format
+    ext = ".jpg"
+
+    if props.target_mode == "UNITY_HDRP":
+        format = "PNG"
+
+    if format == "PNG":
+        ext = ".png"
+    elif format == "JPEG":
+        ext = ".jpg"
+
+    return format, ext
+
+
 def get_bake_path():
     props = bpy.context.scene.CC3BakeProps
 
@@ -37,14 +53,9 @@ def get_bake_path():
 def make_image_target(nodes, name, size, data = True, alpha = False):
     props = bpy.context.scene.CC3BakeProps
 
-    format = props.target_format
-    ext = ".jpg"
-    if format == "PNG":
-        ext = ".png"
-    elif format == "JPEG":
-        ext = ".jpg"
+    format, ext = get_image_format()
     depth = 24
-    if alpha: depth = 32
+    if alpha or format == "PNG": depth = 32
 
     path = get_bake_path()
 
@@ -68,10 +79,10 @@ def make_image_target(nodes, name, size, data = True, alpha = False):
                         img.scale(size, size)
                     return img
                 except:
-                    utils.log_error("Bad image: " + img.name)
+                    utils.log_info("Bad image: " + img.name)
                     bpy.data.images.remove(img)
             else:
-                utils.log_error("Wrong path or format: " + img.name)
+                utils.log_info("Wrong path or format: " + img.name + ", " + img_path + "==" + path + "?, " + img.file_format + "==" + format + "?, depth: " + str(depth) + "==" + str(img.depth) + "?")
                 bpy.data.images.remove(img)
 
     # or just make a new one:
@@ -89,12 +100,7 @@ def copy_image_target(image_node, name, size, data = True, alpha = False):
     if image_node.image.size[0] == 0 or image_node.image.size[1] == 0:
         return None
 
-    format = props.target_format
-    ext = ".jpg"
-    if format == "PNG":
-        ext = ".png"
-    elif format == "JPEG":
-        ext = ".jpg"
+    format, ext = get_image_format()
     depth = 24
     if alpha: depth = 32
 
@@ -118,6 +124,7 @@ def copy_image_target(image_node, name, size, data = True, alpha = False):
 
     utils.log_info("Copying existing image: " + image_node.image.name)
     img = image_node.image.copy()
+    img.name = name
     if img.size[0] != size or img.size[1] != size:
         utils.log_info("Resizing image: " + str(size))
         img.scale(size, size)
@@ -192,7 +199,7 @@ def prep_bake():
     bpy.context.scene.render.bake.target = 'IMAGE_TEXTURES'
     bpy.context.scene.render.bake.margin = 16
     bpy.context.scene.render.bake.use_clear = True
-    bpy.context.scene.render.image_settings.file_format = props.target_format
+    bpy.context.scene.render.image_settings.file_format = get_image_format()[0]
     bpy.context.scene.render.image_settings.quality = props.jpeg_quality
     bpy.context.scene.render.image_settings.compression = props.png_compression
 
@@ -310,7 +317,8 @@ def bake_socket_input(source_mat, mat, to_node, to_socket, suffix, data = True):
 
 def bake_socket_output(source_mat, mat, from_node, from_socket, suffix, data = True):
     if from_node:
-        if from_node.type == "TEX_IMAGE":
+        # Note: Don't copy Alpha inputs as full textures, just Color inputs:
+        if from_node.type == "TEX_IMAGE" and from_socket == "Color":
             return copy_target(source_mat, mat, from_node, from_socket, suffix, data)
         else:
             return bake_target(source_mat, mat, from_node, from_socket, suffix, data)
@@ -1040,13 +1048,6 @@ def bake_selected_objects():
     engine = bpy.context.scene.render.engine
     bpy.context.scene.render.engine = 'CYCLES'
 
-    # set jpeg quality
-    bpy.context.scene.render.image_settings.file_format = props.target_format
-    if props.target_format == "JPEG":
-        bpy.context.scene.render.image_settings.quality = props.jpeg_quality
-    if props.target_format == "PNG":
-        bpy.context.scene.render.image_settings.compression = props.png_compression
-
     materials_done = []
     for obj in objects:
         if obj.type == "MESH":
@@ -1625,12 +1626,18 @@ class CC3BakePanel(bpy.types.Panel):
         col_2.prop(props, "target_mode", text="", slider = True)
         col_1.label(text="Bake Samples")
         col_2.prop(props, "bake_samples", text="", slider = True)
-        col_1.label(text="Format")
-        col_2.prop(props, "target_format", text="", slider = True)
-        if props.target_format == "JPEG":
-            col_1.label(text="JPEG Quality")
-            col_2.prop(props, "jpeg_quality", text="", slider = True)
-        if props.target_format == "PNG":
+        if props.target_mode != "UNITY_HDRP":
+            col_1.label(text="Format")
+            col_2.prop(props, "target_format", text="", slider = True)
+            if props.target_format == "JPEG":
+                col_1.label(text="JPEG Quality")
+                col_2.prop(props, "jpeg_quality", text="", slider = True)
+        else:
+            layout.box().label(text = "Unity HDRP is PNG Only")
+            split = layout.split(factor=0.5)
+            col_1 = split.column()
+            col_2 = split.column()
+        if props.target_format == "PNG" or props.target_mode == "UNITY_HDRP":
             col_1.label(text="PNG Compression")
             col_2.prop(props, "png_compression", text="", slider = True)
         col_1.label(text="Max Size")

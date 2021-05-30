@@ -6,11 +6,11 @@ NO_SIZE = 64
 DEFAULT_SIZE = 1024
 
 BAKE_TARGETS = [
-    ("BLENDER","Blender", "To Blenders, already Blenders?!"),
-    ("SKETCHFAB","Sketchfab", "To sketchfabs!"),
-    ("GLTF","GLTF", "Bake for .GLTF exports!"),
-    ("UNITY_HDRP","Unity HDRP","To unities HDRP!"),
-    ("UNITY_URP","Unity 3D/URP","To unities 3D/URP!"),
+    ("BLENDER","Blender", "Bake textures for Blender. The baked textures should be more performant than the complex node materials"),
+    ("SKETCHFAB","Sketchfab", "Bake and name the textures for Sketchfab. Uploading the baked textures with the .blend file to Sketchfab should auto connect the textures to the materials"),
+    ("GLTF","GLTF", "Bake the relevant textures to be compatible with the GLTF exporter"),
+    ("UNITY_HDRP","Unity HDRP","Bake and pack the textures for the Unity HDRP/Lit shader. Once baked only the BaseMap, Mask and Detail, Subsurface, Thickness and Emission textures are needed"),
+    ("UNITY_URP","Unity 3D/URP","Bake the textures for Unity 3D Standard shader or for URP/Lit shader"),
 ]
 
 TARGET_FORMATS = [

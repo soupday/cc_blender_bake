@@ -34,7 +34,7 @@ def get_bake_path():
     return path
 
 
-def add_image_target(nodes, name, size, data = True, alpha = False):
+def make_image_target(nodes, name, size, data = True, alpha = False):
     props = bpy.context.scene.CC3BakeProps
 
     format = props.target_format
@@ -43,12 +43,12 @@ def add_image_target(nodes, name, size, data = True, alpha = False):
         ext = ".png"
     elif format == "JPEG":
         ext = ".jpg"
+    depth = 24
+    if alpha: depth = 32
 
     path = get_bake_path()
 
     # find an old image with the same name to reuse:
-    depth = 24
-    if alpha: depth = 32
     for img in bpy.data.images:
         if img.name.startswith(name) and img.name.endswith(name):
 
@@ -75,23 +75,149 @@ def add_image_target(nodes, name, size, data = True, alpha = False):
                 bpy.data.images.remove(img)
 
     # or just make a new one:
-    img = make_new_image(name, size, format, ext, path, data, alpha)
-
     utils.log_info("Creating new image: " + name + " size: " + str(size))
+    img = make_new_image(name, size, format, ext, path, data, alpha)
     return img
 
 
-#def copy_image_node(nodes, from_node, name):
-#    new_image = from_node.image.copy()
-#    new_image.file_format = "JPEG"
-#    dir = os.path.join(bpy.path.abspath("//"), "bake")
-#    os.makedirs(dir)
-#    new_image.filepath_raw = os.path.join(dir, name + ".jpg")
-#    new_image.save()
-#    image_node = nodeutils.make_image_node(nodes, new_image)
-#    image_node.name = BAKE_PREFIX + name
-#    image_node.select = True
-#    nodes.active = image_node
+def copy_image_target(image_node, name, size, data = True, alpha = False):
+    props = bpy.context.scene.CC3BakeProps
+
+    # return None if it's a bad image source
+    if image_node is None or image_node.image is None:
+        return None
+    if image_node.image.size[0] == 0 or image_node.image.size[1] == 0:
+        return None
+
+    format = props.target_format
+    ext = ".jpg"
+    if format == "PNG":
+        ext = ".png"
+    elif format == "JPEG":
+        ext = ".jpg"
+    depth = 24
+    if alpha: depth = 32
+
+    path = get_bake_path()
+
+    # find an old image with the same name to reuse:
+    for img in bpy.data.images:
+        if img.name.startswith(name) and img.name.endswith(name):
+
+            img_path, img_file = os.path.split(img.filepath)
+            same_path = False
+            try:
+                if os.path.samefile(path, img_path):
+                    same_path = True
+            except:
+                same_path = False
+
+            if same_path:
+                utils.log_info("Removing existing copy: " + img.name)
+                bpy.data.images.remove(img)
+
+    utils.log_info("Copying existing image: " + image_node.image.name)
+    img = image_node.image.copy()
+    if img.size[0] != size or img.size[1] != size:
+        utils.log_info("Resizing image: " + str(size))
+        img.scale(size, size)
+    if img.file_format != format:
+        utils.log_info("Changing image format: " + format)
+        img.file_format = format
+
+    dir = os.path.join(bpy.path.abspath("//"), path)
+    os.makedirs(dir, exist_ok=True)
+    img.filepath_raw = os.path.join(dir, name + ext)
+    img.save()
+
+    return img
+
+
+def copy_target(source_mat, mat, source_node, source_socket, map_suffix, data):
+    props = bpy.context.scene.CC3BakeProps
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+
+    target_suffix = get_target_map_suffix(map_suffix)
+    mat_name = utils.strip_name(mat.name)
+    size = get_target_map_size(source_mat, map_suffix)
+
+    utils.log_info("Copying direct image source: " + source_node.name)
+
+    image = copy_image_target(source_node, mat_name + "_" + target_suffix, size, data)
+
+    # fall back to baking the source if we can't copy the image:
+    if image is None:
+        utils.log_info("Bad image source, falling back to baking!")
+        return bake_target(source_mat, mat, source_node, source_socket, map_suffix, data)
+
+    image_node = nodeutils.make_image_node(nodes, image)
+    image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
+
+    return image_node
+
+
+old_samples = 64
+old_file_format = "PNG"
+old_quality = 90
+old_compression = 15
+old_view_transform = "Standard"
+old_look = "None"
+old_gamma = 1
+old_exposure = 0
+old_colorspace = "Raw"
+
+def prep_bake():
+    global old_samples, old_file_format, old_quality, old_compression
+    global old_view_transform, old_look, old_gamma, old_exposure, old_colorspace
+
+    old_samples = bpy.context.scene.cycles.samples
+    old_file_format = bpy.context.scene.render.image_settings.file_format
+    old_quality = bpy.context.scene.render.image_settings.quality
+    old_compression = bpy.context.scene.render.image_settings.compression
+    old_view_transform = bpy.context.scene.view_settings.view_transform
+    old_look = bpy.context.scene.view_settings.look
+    old_gamma = bpy.context.scene.view_settings.gamma
+    old_exposure = bpy.context.scene.view_settings.exposure
+    old_colorspace = bpy.context.scene.sequencer_colorspace_settings.name
+
+    props = bpy.context.scene.CC3BakeProps
+
+    bpy.context.scene.cycles.samples = props.bake_samples
+
+    bpy.context.scene.render.use_bake_multires = False
+    bpy.context.scene.render.bake.use_selected_to_active = False
+    bpy.context.scene.render.bake.use_pass_direct = False
+    bpy.context.scene.render.bake.use_pass_indirect = False
+    bpy.context.scene.render.bake.target = 'IMAGE_TEXTURES'
+    bpy.context.scene.render.bake.margin = 16
+    bpy.context.scene.render.bake.use_clear = True
+    bpy.context.scene.render.image_settings.file_format = props.target_format
+    bpy.context.scene.render.image_settings.quality = props.jpeg_quality
+    bpy.context.scene.render.image_settings.compression = props.png_compression
+
+    bpy.context.scene.view_settings.view_transform = 'Standard' #'Raw'
+    bpy.context.scene.view_settings.look = 'None'
+    bpy.context.scene.view_settings.gamma = 1
+    bpy.context.scene.view_settings.exposure = 0
+    bpy.context.scene.sequencer_colorspace_settings.name = 'Raw'
+
+def post_bake():
+    global old_samples, old_file_format, old_quality, old_compression
+    global old_view_transform, old_look, old_gamma, old_exposure, old_colorspace
+
+    bpy.context.scene.cycles.samples = old_samples
+
+    bpy.context.scene.render.image_settings.file_format = old_file_format
+    bpy.context.scene.render.image_settings.quality = old_quality
+    bpy.context.scene.render.image_settings.compression = old_compression
+
+    bpy.context.scene.view_settings.view_transform = old_view_transform
+    bpy.context.scene.view_settings.look = old_look
+    bpy.context.scene.view_settings.gamma = old_gamma
+    bpy.context.scene.view_settings.exposure = old_exposure
+    bpy.context.scene.sequencer_colorspace_settings.name = old_colorspace
+
 
 
 def bake_target(source_mat, mat, source_node, source_socket, map_suffix, data):
@@ -102,42 +228,38 @@ def bake_target(source_mat, mat, source_node, source_socket, map_suffix, data):
     target_suffix = get_target_map_suffix(map_suffix)
     output_node = nodeutils.find_node_by_type(nodes, "OUTPUT_MATERIAL")
     mat_name = utils.strip_name(mat.name)
-    nodeutils.link_nodes(links, source_node, source_socket, output_node, "Surface")
-    size = get_target_map_size(source_mat, map_suffix)
-    image = add_image_target(nodes, mat_name + "_" + target_suffix, size, data)
+    target_size = get_target_map_size(source_mat, map_suffix)
+    source_size = detect_size_from_suffix(source_mat, map_suffix)
+
+    if props.scale_maps and target_size < source_size:
+        utils.log_info("Baking source size: " + str(source_size))
+        size = source_size
+    else:
+        size = target_size
+
+    image = make_image_target(nodes, mat_name + "_" + target_suffix, size, data)
     image_node = nodeutils.make_image_node(nodes, image)
     image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
-    image_node.select = True
-    nodes.active = image_node
+
     bpy.context.scene.cycles.samples = props.bake_samples
     utils.log_info("Baking: " + source_node.name + " / " + source_socket + " suffix " + target_suffix)
 
-    bpy.context.scene.cycles.samples = props.bake_samples
-    bpy.context.scene.render.use_bake_multires = False
-    bpy.context.scene.render.bake.use_selected_to_active = False
-    bpy.context.scene.render.bake.use_pass_direct = False
-    bpy.context.scene.render.bake.use_pass_indirect = False
-    bpy.context.scene.render.bake.target = 'IMAGE_TEXTURES'
-    bpy.context.scene.render.bake.margin = 16
-    bpy.context.scene.render.bake.use_clear = True
+    prep_bake()
 
-    bpy.context.scene.render.image_settings.file_format = props.target_format
-    bpy.context.scene.render.image_settings.quality = props.jpeg_quality
-    bpy.context.scene.render.image_settings.compression = props.png_compression
+    nodeutils.link_nodes(links, source_node, source_socket, output_node, "Surface")
+    image_node.select = True
+    nodes.active = image_node
+    bpy.ops.object.bake(type='COMBINED')
 
-    # cheap hack to get blender to change the image to correct quality/compression
-    # (but save_render messes with the color space so we can't use this to save the final image...)
+    if props.scale_maps and target_size < source_size:
+        utils.log_info("Scaling to target size: " + str(target_size))
+        image.scale(target_size, target_size)
+
     image.save_render(filepath = image.filepath, scene = bpy.context.scene)
     image.reload()
 
-    bpy.ops.object.bake(type='COMBINED')
+    post_bake()
 
-    image.save()
-    image.reload()
-    loc = source_node.location.copy()
-    loc[0] += 25
-    loc[1] += 25
-    image_node.location = loc
     return image_node
 
 
@@ -149,51 +271,50 @@ def bake_shader_normal(source_mat, mat):
     shader_node = nodeutils.get_shader_node(nodes)
     output_node = nodeutils.find_node_by_type(nodes, "OUTPUT_MATERIAL")
     mat_name = utils.strip_name(mat.name)
-    nodeutils.link_nodes(links, shader_node, "BSDF", output_node, "Surface")
-    size = get_target_map_size(source_mat, "Normal")
-    image = add_image_target(nodes, mat_name + "_Normal", size, True)
+
+    target_size = get_target_map_size(source_mat, "Normal")
+    source_size = detect_size_from_suffix(source_mat, "Normal")
+
+    if props.scale_maps and target_size < source_size:
+        size = source_size
+    else:
+        size = target_size
+
+    image = make_image_target(nodes, mat_name + "_Normal", size, True)
     image_node = nodeutils.make_image_node(nodes, image)
     image_node.name = vars.BAKE_PREFIX + mat_name + "_Normal"
+
+    prep_bake()
+
+    nodeutils.link_nodes(links, shader_node, "BSDF", output_node, "Surface")
     image_node.select = True
     nodes.active = image_node
+    bpy.ops.object.bake(type='NORMAL')
 
-    bpy.context.scene.cycles.samples = props.bake_samples
-    bpy.context.scene.render.use_bake_multires = False
-    bpy.context.scene.render.bake.use_selected_to_active = False
-    bpy.context.scene.render.bake.use_pass_direct = False
-    bpy.context.scene.render.bake.use_pass_indirect = False
-    bpy.context.scene.render.bake.target = 'IMAGE_TEXTURES'
-    bpy.context.scene.render.bake.margin = 16
-    bpy.context.scene.render.bake.use_clear = True
+    if props.scale_maps and target_size < source_size:
+        image.scale(target_size, target_size)
 
-    bpy.context.scene.render.image_settings.file_format = props.target_format
-    bpy.context.scene.render.image_settings.quality = props.jpeg_quality
-    bpy.context.scene.render.image_settings.compression = props.png_compression
-
-    # cheap hack to get blender to change the image to correct quality/compression
-    # (but save_render messes with the color space so we can't use this to save the final image...)
     image.save_render(filepath = image.filepath, scene = bpy.context.scene)
     image.reload()
 
-    bpy.ops.object.bake(type='NORMAL')
+    post_bake()
 
-    image.save()
-    image.reload()
     return image_node
 
 
-def bake_socket_input(source_mat, mat, node, socket, suffix, data = True):
-    from_node = nodeutils.get_node_connected_to_input(node, socket)
-    from_socket = nodeutils.get_socket_connected_to_input(node, socket)
-    if from_node: # and from_node.type != "TEX_IMAGE":
-        return bake_target(source_mat, mat, from_node, from_socket, suffix, data)
+def bake_socket_input(source_mat, mat, to_node, to_socket, suffix, data = True):
+    from_node = nodeutils.get_node_connected_to_input(to_node, to_socket)
+    from_socket = nodeutils.get_socket_connected_to_input(to_node, to_socket)
+    return bake_socket_output(source_mat, mat, from_node, from_socket, suffix, data)
+
+
+def bake_socket_output(source_mat, mat, from_node, from_socket, suffix, data = True):
+    if from_node:
+        if from_node.type == "TEX_IMAGE":
+            return copy_target(source_mat, mat, from_node, from_socket, suffix, data)
+        else:
+            return bake_target(source_mat, mat, from_node, from_socket, suffix, data)
     return from_node
-
-
-def bake_socket_output(source_mat, mat, node, socket, suffix, data = True):
-    if node: # and node.type != "TEX_IMAGE":
-        return bake_target(source_mat, mat, node, socket, suffix, data)
-    return node
 
 
 def position(node, loc):
@@ -373,7 +494,7 @@ def bake_material(obj, mat, source_mat):
 
     # Alpha Maps
     alpha_bake_node = None
-    if "Alpha" in bake_maps:
+    if mat.blend_method != "OPAQUE" and "Alpha" in bake_maps:
         prep_alpha(mat, shader_node)
         alpha_bake_node = bake_socket_input(source_mat, mat, shader_node, "Alpha", "Alpha")
 
@@ -517,7 +638,7 @@ def combine_diffuse_tex(nodes, source_mat, mat, diffuse_node, alpha_node):
     target_suffix = get_target_map_suffix(map_suffix)
     mat_name = utils.strip_name(mat.name)
     size = get_target_map_size(source_mat, map_suffix)
-    image = add_image_target(nodes, mat_name + "_" + target_suffix, size, True, True)
+    image = make_image_target(nodes, mat_name + "_" + target_suffix, size, True, True)
     image_node = nodeutils.make_image_node(nodes, image)
     image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
     image_node.select = True
@@ -579,7 +700,7 @@ def combine_hdrp_mask_tex(nodes, source_mat, mat, metallic_node, ao_node, mask_n
     target_suffix = get_target_map_suffix(map_suffix)
     mat_name = utils.strip_name(mat.name)
     size = get_target_map_size(source_mat, map_suffix)
-    image = add_image_target(nodes, mat_name + "_" + target_suffix, size, True, True)
+    image = make_image_target(nodes, mat_name + "_" + target_suffix, size, True, True)
     image_node = nodeutils.make_image_node(nodes, image)
     image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
     image_node.select = True
@@ -648,7 +769,7 @@ def combine_hdrp_detail_tex(nodes, source_mat, mat, detail_normal_node):
     target_suffix = get_target_map_suffix(map_suffix)
     mat_name = utils.strip_name(mat.name)
     size = get_target_map_size(source_mat, map_suffix)
-    image = add_image_target(nodes, mat_name + "_" + target_suffix, size, True, True)
+    image = make_image_target(nodes, mat_name + "_" + target_suffix, size, True, True)
     image_node = nodeutils.make_image_node(nodes, image)
     image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
     image_node.select = True
@@ -708,7 +829,7 @@ def make_smoothness_tex(nodes, source_mat, mat, roughness_node):
     target_suffix = get_target_map_suffix(map_suffix)
     mat_name = utils.strip_name(mat.name)
     size = get_target_map_size(source_mat, map_suffix)
-    image = add_image_target(nodes, mat_name + "_" + target_suffix, size, True, False)
+    image = make_image_target(nodes, mat_name + "_" + target_suffix, size, True, False)
     image_node = nodeutils.make_image_node(nodes, image)
     image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
     image_node.select = True
@@ -1082,7 +1203,9 @@ def detect_size_from_suffix(mat, suffix):
     return vars.DEFAULT_SIZE
 
 
-def get_target_map_size(mat, suffix):
+
+
+def get_target_map_size(mat, suffix, no_max_override = False):
 
     # get either the global default props or the material specific props if they exist...
     props = bpy.context.scene.CC3BakeProps
@@ -1093,6 +1216,9 @@ def get_target_map_size(mat, suffix):
     # fetch the default size from the the existing textures if possible
     size = detect_size_from_suffix(mat, suffix)
     max_size = int(props.max_size)
+
+    if no_max_override:
+        return max_size
 
     # if overriding with custom max sizes:
     bake_maps = vars.get_bake_target_maps(props.target_mode)
@@ -1509,6 +1635,8 @@ class CC3BakePanel(bpy.types.Panel):
             col_2.prop(props, "png_compression", text="", slider = True)
         col_1.label(text="Max Size")
         col_2.prop(props, "max_size", text="")
+        #col_1.label(text="Scale Maps")
+        #col_2.prop(props, "scale_maps", text="")
         col_1.label(text="Allow Bump Maps")
         col_2.prop(props, "allow_bump_maps", text="", slider = True)
         col_1.label(text="AO in Diffuse")
@@ -1615,7 +1743,7 @@ class CC3BakeMaterialSettings(bpy.types.PropertyGroup):
     specular_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     roughness_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     emissive_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
-    alpha_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="4096")
+    alpha_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     normal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="4096")
     micronormal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     micronormalmask_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")
@@ -1633,12 +1761,13 @@ class CC3BakeProps(bpy.types.PropertyGroup):
 
     target_format: bpy.props.EnumProperty(items=vars.TARGET_FORMATS, default="JPEG")
 
-    bake_samples: bpy.props.IntProperty(default=5, min=1, max=16)
+    bake_samples: bpy.props.IntProperty(default=5, min=1, max=64)
     ao_in_diffuse: bpy.props.FloatProperty(default=0, min=0, max=1, description="How much of the ambient occlusion to bake into the diffuse.")
 
     smoothness_mapping: bpy.props.EnumProperty(items=vars.CONVERSION_FUNCTIONS, default="IR", description="Roughness to smoothness calculation.")
 
     allow_bump_maps: bpy.props.BoolProperty(default=True)
+    scale_maps: bpy.props.BoolProperty(default=False)
 
     custom_sizes: bpy.props.BoolProperty(default=False)
     max_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="4096")
@@ -1651,7 +1780,7 @@ class CC3BakeProps(bpy.types.PropertyGroup):
     specular_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     roughness_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     emissive_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
-    alpha_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="4096")
+    alpha_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     normal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="4096")
     micronormal_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     micronormalmask_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="1024")

@@ -20,7 +20,7 @@ from . import bake
 bl_info = {
     "name": "CC3 Bake",
     "author": "Victor Soupday",
-    "version": (0, 1, 2),
+    "version": (0, 1, 3),
     "blender": (2, 80, 0),
     "category": "Character",
     "location": "3D View > Properties> CC3 Bake",

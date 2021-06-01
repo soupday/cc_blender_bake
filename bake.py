@@ -275,6 +275,8 @@ def bake_shader_normal(source_mat, mat):
 
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
+
+    target_suffix = get_target_map_suffix("Normal")
     shader_node = nodeutils.get_shader_node(nodes)
     output_node = nodeutils.find_node_by_type(nodes, "OUTPUT_MATERIAL")
     mat_name = utils.strip_name(mat.name)
@@ -287,7 +289,7 @@ def bake_shader_normal(source_mat, mat):
     else:
         size = target_size
 
-    image = make_image_target(nodes, mat_name + "_Normal", size, True)
+    image = make_image_target(nodes, mat_name + "_" + target_suffix, size, True)
     image_node = nodeutils.make_image_node(nodes, image)
     image_node.name = vars.BAKE_PREFIX + mat_name + "_Normal"
 
@@ -1619,6 +1621,8 @@ class CC3BakePanel(bpy.types.Panel):
         layout.use_property_split = False
         layout.use_property_decorate = False
 
+        bake_maps = vars.get_bake_target_maps(props.target_mode)
+
         split = layout.split(factor=0.5)
         col_1 = split.column()
         col_2 = split.column()
@@ -1644,10 +1648,12 @@ class CC3BakePanel(bpy.types.Panel):
         col_2.prop(props, "max_size", text="")
         #col_1.label(text="Scale Maps")
         #col_2.prop(props, "scale_maps", text="")
-        col_1.label(text="Allow Bump Maps")
-        col_2.prop(props, "allow_bump_maps", text="", slider = True)
-        col_1.label(text="AO in Diffuse")
-        col_2.prop(props, "ao_in_diffuse", text="", slider = True)
+        if "Bump" in bake_maps:
+            col_1.label(text="Allow Bump Maps")
+            col_2.prop(props, "allow_bump_maps", text="", slider = True)
+        if "AO" in bake_maps:
+            col_1.label(text="AO in Diffuse")
+            col_2.prop(props, "ao_in_diffuse", text="", slider = True)
         if props.target_mode == "UNITY_HDRP" or props.target_mode == "UNITY_URP":
             col_1.label(text="Smoothness Mapping")
             col_2.prop(props, "smoothness_mapping", text="", slider = True)
@@ -1662,7 +1668,6 @@ class CC3BakePanel(bpy.types.Panel):
         obj = context.object
         mat = context_material(context)
         bake_cache = get_bake_cache(mat)
-        bake_maps = vars.get_bake_target_maps(props.target_mode)
 
         if props.custom_sizes:
 

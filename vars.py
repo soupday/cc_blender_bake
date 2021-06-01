@@ -71,7 +71,7 @@ SKETCHFAB_MAPS = {
 
 GLTF_MAPS = {
     "Diffuse": ["baseColor", "diffuse_size"],
-    "AO": ["occlusion", "ao_size"],
+    #"AO": ["occlusion", "ao_size"], # TODO needs "glTF settings" node group to work...
     "Metallic": ["metallic", "metallic_size"],
     "Roughness": ["roughness", "roughness_size"],
     "Emission": ["emission", "emissive_size"],

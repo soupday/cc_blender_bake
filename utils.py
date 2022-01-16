@@ -56,7 +56,38 @@ def get_active_object():
 
 
 def set_active_object(obj):
-    bpy.context.view_layer.objects.active = obj
+    try:
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        return (bpy.context.active_object == obj)
+    except:
+        return False
+
+
+def try_select_object(obj):
+    try:
+        obj.select_set(True)
+        return True
+    except:
+        return False
+
+
+def try_select_objects(objects, clear_selection = False):
+    if clear_selection:
+        clear_selected_objects()
+    result = True
+    for obj in objects:
+        if not try_select_object(obj):
+            result = False
+    return result
+
+
+def clear_selected_objects():
+    try:
+        bpy.ops.object.select_all(action='DESELECT')
+        return True
+    except:
+        return False
 
 
 def set_mode(mode):
@@ -110,3 +141,15 @@ def get_tex_image_size(node):
     if node is not None:
         return node.image.size[0] if node.image.size[0] > node.image.size[1] else node.image.size[1]
     return 64
+
+
+def check_blender_version(version: str):
+    major, minor, subversion = version.split(".")
+    blender_version = bpy.app.version
+
+    v_test = int(major) * 1000000 + int(minor) * 1000 + int(subversion)
+    v_this = blender_version[0] * 1000000 + blender_version[1] * 1000 + blender_version[2]
+
+    if v_this >= v_test:
+        return True
+    return False

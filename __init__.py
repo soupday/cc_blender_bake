@@ -20,7 +20,7 @@ from . import bake
 bl_info = {
     "name": "CC3 Bake",
     "author": "Victor Soupday",
-    "version": (0, 1, 3),
+    "version": (1, 0, 1),
     "blender": (2, 80, 0),
     "category": "Character",
     "location": "3D View > Properties> CC3 Bake",
@@ -28,6 +28,8 @@ bl_info = {
     "wiki_url": "https://soupday.github.io/cc3_blender_bake/index.html",
     "tracker_url": "https://github.com/soupday/cc3_blender_bake/issues",
 }
+
+vars.set_version_string(bl_info)
 
 CLASSES = (bake.CC3BakeCache, bake.CC3BakeSettings, bake.CC3BakeMaterialSettings,
             bake.CC3BakeProps, bake.CC3Baker, bake.CC3Jpegify, bake.CC3BakePanel, bake.CC3BakeUtilityPanel,

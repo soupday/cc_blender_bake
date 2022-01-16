@@ -1,4 +1,9 @@
 
+VERSION_STRING = "v0.0.0"
+
+def set_version_string(bl_info):
+    global VERSION_STRING
+    VERSION_STRING = "v" + str(bl_info["version"][0]) + "." + str(bl_info["version"][1]) + "." + str(bl_info["version"][2])
 
 BAKE_PREFIX = "bakeutil_"
 
@@ -71,7 +76,7 @@ SKETCHFAB_MAPS = {
 
 GLTF_MAPS = {
     "Diffuse": ["baseColor", "diffuse_size"],
-    #"AO": ["occlusion", "ao_size"], # TODO needs "glTF settings" node group to work...
+    "AO": ["occlusion", "ao_size"],
     "Metallic": ["metallic", "metallic_size"],
     "Roughness": ["roughness", "roughness_size"],
     "Emission": ["emission", "emissive_size"],
@@ -81,19 +86,23 @@ GLTF_MAPS = {
 
 UNITY_URP_MAPS = {
     "Diffuse": ["Diffuse", "diffuse_size"],
-    "Metallic": ["Metallic", "metallic_size"],
-    "Roughness": ["Roughness", "roughness_size"],
+    "AO": ["Occlusion", "ao_size"],
+    "Metallic": ["Metallic", "metallic_alpha_size"],
+    "Roughness": ["Roughness", "metallic_alpha_size"],
     "Emission": ["Emission", "emission_size"],
     "Alpha": ["Opacity", "diffuse_size"],
     "Normal": ["Normal", "normal_size"],
     "Bump": ["bump", "bump_size"],
-
-    "Smoothness": ["Smoothness", "roughness_size"],
+    "MicroNormal": ["Mask", "micronormalmask_size"],
+    "MicroNormalMask": ["Detail", "detail_size"],
+    # packed maps
+    "BaseMap": ["BaseMap", "diffuse_size"],
+    "MetallicAlpha": ["MetallicAlpha", "metallic_alpha_size"],
 }
 
 UNITY_HDRP_MAPS = {
     "Diffuse": ["Diffuse", "diffuse_size"],
-    "AO": ["AO", "mask_size"],
+    "AO": ["Occlusion", "mask_size"],
     "Subsurface": ["Subsurface", "sss_size"],
     "Thickness": ["Thickness", "thickness_size"],
     "Metallic": ["Metallic", "mask_size"],
@@ -104,7 +113,7 @@ UNITY_HDRP_MAPS = {
     "Bump": ["bump", "bump_size"],
     "MicroNormal": ["MicroNormal", "detail_size"],
     "MicroNormalMask": ["MicroNormalMask", "mask_size"],
-
+    # packed maps
     "BaseMap": ["BaseMap", "diffuse_size"],
     "Mask": ["Mask", "mask_size"],
     "Detail": ["Detail", "detail_size"],
@@ -125,74 +134,79 @@ TEX_LIST = [
 
 TEX_SIZE_DETECT = {
     "diffuse_size": [
-        ["diffuse_tex"], ["Base Color:DIFFUSE"]
+        ["DIFFUSE"], ["Base Color:DIFFUSE"]
     ],
 
     "ao_size": [
-        ["ao_tex"], ["Base Color:AO"]
+        ["AO"], ["Base Color:AO"]
     ],
 
     "sss_size": [
-        ["sss_tex"], None
+        ["SSS"], None
     ],
 
     "thickness_size": [
-        ["transmission_tex"], None
+        ["TRANSMISSION"], None
     ],
 
     "transmission_size": [
-        ["transmissionb_tex"], ["Transmission"]
-        # note: there is no 'transmissionb_tex', it's just a key to override the
+        ["TRANSMISSION_OVERRIDE"], ["Transmission"]
+        # note: there is no '_TRANSMISSION_B', it's just a key to override the
         # transmission texture size in the TEX_SIZE_OVERRIDE list...
     ],
 
     "specular_size": [
-        ["specular_tex", "specular_mask_tex"], ["Specular"]
+        ["SPECULAR", "SPECMASK"], ["Specular"]
     ],
 
     "metallic_size": [
-        ["metallic_tex"], ["Metallic"]
+        ["METALLIC"], ["Metallic"]
     ],
 
     "roughness_size": [
-        ["roughness_tex"], ["Roughness"]
+        ["ROUGHNESS"], ["Roughness"]
     ],
 
     "smoothness_size": [
-        ["roughness_tex"], ["Roughness"]
+        ["ROUGHNESS"], ["Roughness"]
     ],
 
     "emission_size": [
-        ["emission_tex"], ["Emission"]
+        ["EMISSION"], ["Emission"]
     ],
 
     "alpha_size": [
-        ["opacity_tex"], ["Alpha"]
+        ["ALPHA"], ["Alpha"]
     ],
 
     "normal_size": [
-        ["normal_tex", "normal_blend_tex", "sclera_normal_tex"], ["Normal:NORMAL"]
+        ["NORMAL", "NORMALBLEND", "SCLERANORMAL"], ["Normal:NORMAL"]
     ],
 
     "bump_size": [
-        ["bump_tex"], ["Normal:BUMP"]
+        ["BUMP"], ["Normal:BUMP"]
     ],
 
     "detail_size": [
-        ["micro_normal_tex"], None
+        ["MICRONORMAL"], None
     ],
 
     "micronormalmask_size": [
-        ["micro_normal_mask_tex"], None
+        ["MICRONMASK"], None
     ],
 
     "micronormal_size": [
-        ["micro_normal_tex"], None
+        ["MICRONORMAL"], None
     ],
 
     "mask_size": [
-        ["roughness_tex", "ao_tex", "metallic_tex", "micro_normal_mask_tex"],
+        ["ROUGHNESS", "AO", "METALLIC", "MICRONMASK"],
         ["Base Color", "Roughness", "Metallic"]
+    ],
+
+    "metallic_alpha_size": [
+        ["ROUGHNESS", "METALLIC"],
+        ["Roughness", "Metallic"]
     ],
 }
 
@@ -200,50 +214,50 @@ TEX_SIZE_DETECT = {
 # override the texture size for procedurally generated maps
 TEX_SIZE_OVERRIDE = {
     "CORNEA_LEFT": {
-        "roughness_tex": 256,
-        "sss_tex": 256,
-        "specular_tex": 256,
-        "opacity_tex": 256,
-        "transmissionb_tex": 256,
+        "ROUGHNESS": 256,
+        "SSS": 256,
+        "SPECULAR": 256,
+        "ALPHA": 256,
+        "TRANSMISSION_OVERRIDE": 256,
     },
 
     "CORNEA_RIGHT": {
-        "roughness_tex": 256,
-        "sss_tex": 256,
-        "specular_tex": 256,
-        "opacity_tex": 256,
-        "transmissionb_tex": 256,
+        "ROUGHNESS": 256,
+        "SSS": 256,
+        "SPECULAR": 256,
+        "ALPHA": 256,
+        "TRANSMISSION_OVERRIDE": 256,
     },
 
     "EYE_LEFT": {
-        "roughness_tex": 256,
-        "sss_tex": 256,
-        "specular_tex": 256,
+        "ROUGHNESS": 256,
+        "SSS": 256,
+        "SPECULAR": 256,
     },
 
     "EYE_RIGHT": {
-        "roughness_tex": 256,
-        "sss_tex": 256,
-        "specular_tex": 256,
+        "ROUGHNESS": 256,
+        "SSS": 256,
+        "SPECULAR": 256,
     },
 
     "OCCLUSION_LEFT": {
-        "opacity_tex": 256,
+        "ALPHA": 256,
     },
 
     "OCCLUSION_RIGHT": {
-        "opacity_tex": 256,
+        "ALPHA": 256,
     },
 
     "HAIR": {
-        "bump_tex": 2048,
+        "BUMP": 2048,
     },
 
     "SMART_HAIR": {
-        "bump_tex": 2048,
+        "BUMP": 2048,
     },
 
     "SCALP": {
-        "bump_tex": 2048,
+        "BUMP": 2048,
     },
 }

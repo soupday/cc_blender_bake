@@ -1,12 +1,22 @@
 import bpy
-from . import utils
+from . import utils, vars
 
 NODE_PREFIX = "cc3iid_"
 
-def get_shader_node(nodes):
+def get_bsdf_node(nodes):
     for n in nodes:
         if n.type == "BSDF_PRINCIPLED":
             return n
+    return None
+
+
+def get_shader_node(nodes):
+    for n in nodes:
+        if n.type == "GROUP" and "(rl_" in n.name and "_shader)" in n.name:
+            name = n.node_tree.name
+            if NODE_PREFIX in name and "_rl_" in name and "_shader_" in name:
+                return n
+    return None
 
 
 def get_shader_input(nodes, input):
@@ -15,6 +25,11 @@ def get_shader_input(nodes, input):
         socket = shader.inputs[input]
 
     return None
+
+
+def is_connected(node : bpy.types.Node, socket):
+    if node and socket in node.inputs:
+        return node.inputs[socket].is_linked
 
 
 def get_sockets_connected_to_output(node, socket):
@@ -145,6 +160,14 @@ def make_math_node(nodes, operation, value1 = 0.5, value2 = 0.5):
     math_node.inputs[1].default_value = value2
     return math_node
 
+def make_node_group_node(nodes, group, label, name):
+    group_node = make_shader_node(nodes, "ShaderNodeGroup")
+    group_node.node_tree = group
+    group_node.label = label
+    group_node.width = 240
+    group_node.name = name
+    return group_node
+
 def find_image_node(nodes, name_search, file_search):
     for node in nodes:
         if node.type == "TEX_IMAGE":
@@ -156,6 +179,13 @@ def find_image_node(nodes, name_search, file_search):
                 return node
     return None
 
+def find_shader_texture(nodes, texture_type):
+    id = "(" + texture_type + ")"
+    for node in nodes:
+        if node.type == "TEX_IMAGE" and NODE_PREFIX in node.name and id in node.name:
+            return node
+    return None
+
 ## color_space: Non-Color, sRGB
 def make_image_node(nodes, image):
     if image is None:
@@ -163,6 +193,17 @@ def make_image_node(nodes, image):
     image_node = make_shader_node(nodes, "ShaderNodeTexImage")
     image_node.image = image
     return image_node
+
+
+def make_gltf_settings_node(nodes):
+    gltf_group : bpy.types.NodeGroup = None
+    for group in bpy.data.node_groups:
+        if group.name == "glTF Settings":
+            gltf_group = group
+    if not gltf_group:
+        gltf_group = bpy.data.node_groups.new("glTF Settings", "ShaderNodeTree")
+        gltf_group.inputs.new("NodeSocketColor", "Occlusion")
+    return make_node_group_node(nodes, gltf_group, "glTF Settings", "glTF Settings")
 
 
 # class to show node coords in shader editor...

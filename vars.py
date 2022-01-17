@@ -46,7 +46,6 @@ def get_bake_target_maps(target):
 # global_suffix: ['target_suffix', 'prop_name']
 BLENDER_MAPS = {
     "Diffuse": ["Diffuse", "diffuse_size"],
-    #"AO": ["AO", "ao_size"],
     "Subsurface": ["Subsurface", "sss_size"],
     "Metallic": ["Metallic", "metallic_size"],
     "Specular": ["Specular", "specular_size"],
@@ -75,46 +74,49 @@ SKETCHFAB_MAPS = {
 }
 
 GLTF_MAPS = {
-    "Diffuse": ["baseColor", "diffuse_size"],
-    "AO": ["occlusion", "ao_size"],
-    "Metallic": ["metallic", "metallic_size"],
-    "Roughness": ["roughness", "roughness_size"],
+    "Diffuse": ["baseColor", "basemap_size"],
+    "AO": ["occlusion", "gltf_size"],
+    "Metallic": ["metallic", "gltf_size"],
+    "Roughness": ["roughness", "gltf_size"],
     "Emission": ["emission", "emissive_size"],
-    "Alpha": ["alpha", "alpha_size"],
+    "Alpha": ["alpha", "basemap_size"],
     "Normal": ["normal", "normal_size"],
+    # packed maps
+    "BaseMap": ["baseMap", "basemap_size"],
+    "GLTF": ["glTF", "gltf_size"],
 }
 
 UNITY_URP_MAPS = {
-    "Diffuse": ["Diffuse", "diffuse_size"],
+    "Diffuse": ["Diffuse", "basemap_size"],
     "AO": ["Occlusion", "ao_size"],
     "Metallic": ["Metallic", "metallic_alpha_size"],
     "Roughness": ["Roughness", "metallic_alpha_size"],
     "Emission": ["Emission", "emission_size"],
-    "Alpha": ["Opacity", "diffuse_size"],
+    "Alpha": ["Opacity", "basemap_size"],
     "Normal": ["Normal", "normal_size"],
     "Bump": ["bump", "bump_size"],
     "MicroNormal": ["Mask", "micronormalmask_size"],
     "MicroNormalMask": ["Detail", "detail_size"],
     # packed maps
-    "BaseMap": ["BaseMap", "diffuse_size"],
+    "BaseMap": ["BaseMap", "basemap_size"],
     "MetallicAlpha": ["MetallicAlpha", "metallic_alpha_size"],
 }
 
 UNITY_HDRP_MAPS = {
-    "Diffuse": ["Diffuse", "diffuse_size"],
+    "Diffuse": ["Diffuse", "basemap_size"],
     "AO": ["Occlusion", "mask_size"],
     "Subsurface": ["Subsurface", "sss_size"],
     "Thickness": ["Thickness", "thickness_size"],
     "Metallic": ["Metallic", "mask_size"],
     "Roughness": ["Roughness", "mask_size"],
     "Emission": ["Emission", "emission_size"],
-    "Alpha": ["Opacity", "diffuse_size"],
+    "Alpha": ["Opacity", "basemap_size"],
     "Normal": ["Normal", "normal_size"],
     "Bump": ["bump", "bump_size"],
     "MicroNormal": ["MicroNormal", "detail_size"],
     "MicroNormalMask": ["MicroNormalMask", "mask_size"],
     # packed maps
-    "BaseMap": ["BaseMap", "diffuse_size"],
+    "BaseMap": ["BaseMap", "basemap_size"],
     "Mask": ["Mask", "mask_size"],
     "Detail": ["Detail", "detail_size"],
 }
@@ -201,12 +203,22 @@ TEX_SIZE_DETECT = {
 
     "mask_size": [
         ["ROUGHNESS", "AO", "METALLIC", "MICRONMASK"],
-        ["Base Color", "Roughness", "Metallic"]
+        ["Base Color:AO", "Roughness", "Metallic"]
     ],
 
     "metallic_alpha_size": [
         ["ROUGHNESS", "METALLIC"],
         ["Roughness", "Metallic"]
+    ],
+
+    "gltf_size": [
+        ["AO", "ROUGHNESS", "METALLIC"],
+        ["Base Color:AO", "Roughness", "Metallic"]
+    ],
+
+    "basemap_size": [
+        ["DIFFUSE", "ALPHA"],
+        ["Base Color:DIFFUSE", "Alpha"]
     ],
 }
 

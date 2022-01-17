@@ -607,8 +607,8 @@ def bake_material(obj, mat, source_mat):
                         micro_normal_scale = mathutils.Vector((micro_normal_tiling, micro_normal_tiling, 1))
                 utils.log_info(f"Tiling: {micro_normal_scale}")
                 # disconnect any tiling/mapping nodes before baking the micro normal...
-                #nodeutils.unlink_node(links, micro_normal_node, "Vector")
-                #micro_normal_bake_node = bake_socket_output(source_mat, mat, micro_normal_node, "Color", "MicroNormal")
+                nodeutils.unlink_node(links, micro_normal_node, "Vector")
+                micro_normal_bake_node = bake_socket_output(source_mat, mat, micro_normal_node, "Color", "MicroNormal")
 
     # Micro Normal Mask
     # if the shader group node as a "Normal Mask" float output, bake that,

@@ -133,8 +133,11 @@ def copy_image_target(image_node, name, size, data = True, alpha = False):
         utils.log_info("Resizing image: " + str(size))
         img.scale(size, size)
     if img.file_format != format:
-        utils.log_info("Changing image format: " + format)
-        img.file_format = format
+        if utils.check_blender_version("3.0.0"):
+            utils.log_info("Changing image format: " + format)
+            img.file_format = format
+        else:
+            utils.log_info("Not changing image format of copy in Blender <= 2.93 (causes crash): " + format)
 
     dir = os.path.join(bpy.path.abspath("//"), path)
     os.makedirs(dir, exist_ok=True)
@@ -604,8 +607,8 @@ def bake_material(obj, mat, source_mat):
                         micro_normal_scale = mathutils.Vector((micro_normal_tiling, micro_normal_tiling, 1))
                 utils.log_info(f"Tiling: {micro_normal_scale}")
                 # disconnect any tiling/mapping nodes before baking the micro normal...
-                nodeutils.unlink_node(links, micro_normal_node, "Vector")
-                micro_normal_bake_node = bake_socket_output(source_mat, mat, micro_normal_node, "Color", "MicroNormal")
+                #nodeutils.unlink_node(links, micro_normal_node, "Vector")
+                #micro_normal_bake_node = bake_socket_output(source_mat, mat, micro_normal_node, "Color", "MicroNormal")
 
     # Micro Normal Mask
     # if the shader group node as a "Normal Mask" float output, bake that,
@@ -672,7 +675,7 @@ def bake_material(obj, mat, source_mat):
     utils.log_info("Reconnecting baked material:")
     utils.log_info("")
 
-    reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal_strength, micro_normal_scale)
+    reconnect_material(mat, ao_strength, sss_radius, bump_distance, normal_strength, micro_normal_strength, micro_normal_scale)
 
 
 def combine_diffuse_tex(nodes, source_mat, mat, diffuse_node, alpha_node):
@@ -1002,7 +1005,7 @@ def combine_gltf(nodes, source_mat, mat, ao_node, roughness_node, metallic_node)
     image.save()
 
 
-def reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal_strength, micro_normal_scale):
+def reconnect_material(mat, ao_strength, sss_radius, bump_distance, normal_strength, micro_normal_strength, micro_normal_scale):
     props = bpy.context.scene.CC3BakeProps
 
     nodes = mat.node_tree.nodes
@@ -1157,6 +1160,7 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal
         normal_map_node = nodeutils.make_shader_node(nodes, "ShaderNodeNormalMap")
         nodeutils.link_nodes(links, normal_node, "Color", normal_map_node, "Color")
         nodeutils.link_nodes(links, normal_map_node, "Normal", bsdf_node, "Normal")
+        nodeutils.set_node_input(normal_map_node, "Strength", normal_strength)
     elif bump_node:
         bump_map_node = nodeutils.make_shader_node(nodes, "ShaderNodeBump")
         nodeutils.link_nodes(links, bump_node, "Color", bump_map_node, "Height")
@@ -1473,6 +1477,13 @@ def bake_object(obj, bake_surface, materials_done):
             bake_cache.source_material != source_mat):
             utils.log_info("Using cached source material!")
             source_mat = bake_cache.source_material
+
+        # if there is no BSDF node, don't process.
+        bsdf_node = None
+        if source_mat and source_mat.node_tree:
+            bsdf_node = nodeutils.get_bsdf_node(source_mat.node_tree.nodes)
+        if bsdf_node is None:
+            continue
 
         # only process each material once:
         if source_mat not in materials_done:

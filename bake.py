@@ -24,9 +24,6 @@ def get_image_format():
     format = props.target_format
     ext = ".jpg"
 
-    if props.target_mode == "UNITY_HDRP" or props.target_mode == "UNITY_URP":
-        format = "PNG"
-
     if format == "PNG":
         ext = ".png"
     elif format == "JPEG":
@@ -56,7 +53,10 @@ def make_image_target(nodes, name, size, data = True, alpha = False):
 
     format, ext = get_image_format()
     depth = 24
-    if alpha: depth = 32
+    if alpha:
+        format = "PNG"
+        ext = ".png"
+        depth = 32
 
     path = get_bake_path()
 
@@ -103,7 +103,10 @@ def copy_image_target(image_node, name, size, data = True, alpha = False):
 
     format, ext = get_image_format()
     depth = 24
-    if alpha: depth = 32
+    if alpha:
+        format = "PNG"
+        ext = ".png"
+        depth = 32
 
     path = get_bake_path()
 
@@ -633,27 +636,31 @@ def bake_material(obj, mat, source_mat):
         pass
 
     elif props.target_mode == "GLTF":
-        pass
+        if props.pack_gltf:
+            # BaseMap: RGB: diffuse, A: alpha
+            combine_diffuse_tex(nodes, source_mat, mat,
+                    diffuse_bake_node, alpha_bake_node)
+            # GLTF pack: R: Ao, G: Roughness, B: Metallic
+            combine_gltf(nodes, source_mat, mat, ao_bake_node, roughnesss_bake_node, metallic_bake_node)
 
     elif props.target_mode == "UNITY_URP":
         # BaseMap: RGB: diffuse, A: alpha
-        # Mask: R: Metallic, G: AO, B: Micro-Normal Mask, A: Smoothness = f(roughness)
-        # Detail: R: 0.5, G: Micro-Normal.R, B: 0.5, A: Micro-Normal.G
         combine_diffuse_tex(nodes, source_mat, mat,
                 diffuse_bake_node, alpha_bake_node)
 
+        # MetallicAlpha: RGB: Metallic, A: Smoothness = f(Rougness)
         make_metallic_smoothness_tex(nodes, source_mat, mat, metallic_bake_node, roughnesss_bake_node)
 
     elif props.target_mode == "UNITY_HDRP":
         # BaseMap: RGB: diffuse, A: alpha
-        # Mask: R: Metallic, G: AO, B: Micro-Normal Mask, A: Smoothness = f(roughness)
-        # Detail: R: 0.5, G: Micro-Normal.R, B: 0.5, A: Micro-Normal.G
         combine_diffuse_tex(nodes, source_mat, mat,
                 diffuse_bake_node, alpha_bake_node)
 
+        # Mask: R: Metallic, G: AO, B: Micro-Normal Mask, A: Smoothness = f(Roughness)
         combine_hdrp_mask_tex(nodes, source_mat, mat,
                 metallic_bake_node, ao_bake_node, micro_normal_mask_bake_node, roughnesss_bake_node)
 
+        # Detail: R: 0.5, G: Micro-Normal.R, B: 0.5, A: Micro-Normal.G
         combine_hdrp_detail_tex(nodes, source_mat, mat,
                 micro_normal_bake_node)
 
@@ -933,6 +940,68 @@ def make_metallic_smoothness_tex(nodes, source_mat, mat, metallic_node, roughnes
     image.save()
 
 
+def combine_gltf(nodes, source_mat, mat, ao_node, roughness_node, metallic_node):
+    props = bpy.context.scene.CC3BakeProps
+
+    metallic_data = None
+    ao_data = None
+    roughness_data = None
+
+    if metallic_node:
+        metallic_data = metallic_node.image.pixels[:]
+    if ao_node:
+        ao_data = ao_node.image.pixels[:]
+    if roughness_node:
+        roughness_data = roughness_node.image.pixels[:]
+
+    if metallic_node is None and ao_node is None and roughness_node is None:
+        return
+
+    utils.log_info("Combining GLTF texture pack...")
+
+    bsdf_node = nodeutils.get_bsdf_node(nodes)
+    metallic_value = nodeutils.get_node_input(bsdf_node, "Metallic", 0.0)
+    roughness_value = nodeutils.get_node_input(bsdf_node, "Roughness", 0.0)
+    ao_value = 1
+
+    map_suffix = "GLTF"
+    target_suffix = get_target_map_suffix(map_suffix)
+    mat_name = utils.strip_name(mat.name)
+    size = get_target_map_size(source_mat, map_suffix)
+    image = make_image_target(nodes, mat_name + "_" + target_suffix, size, True, False)
+    image_node = nodeutils.make_image_node(nodes, image)
+    image_node.name = vars.BAKE_PREFIX + mat_name + "_" + map_suffix
+    image_node.select = True
+    nodes.active = image_node
+    image_data = list(image.pixels)
+    l = len(image_data)
+
+    # GLTF: R: AO, G: Roughness, B: Metallic
+    for i in range(0, l, 4):
+
+        # Red
+        if ao_data:
+            image_data[i+0] = ao_data[i]
+        else:
+            image_data[i+0] = ao_value
+
+        # Green
+        if roughness_data:
+            image_data[i+1] = roughness_data[i]
+        else:
+            image_data[i+1] = roughness_value
+
+        # Blue
+        if metallic_data:
+            image_data[i+2] = metallic_data[i]
+        else:
+            image_data[i+2] = metallic_value
+
+    image.pixels[:] = image_data
+    image.update()
+    image.save()
+
+
 def reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal_strength, micro_normal_scale):
     props = bpy.context.scene.CC3BakeProps
 
@@ -945,6 +1014,7 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal
     nodeutils.link_nodes(links, bsdf_node, "BSDF", output_node, "Surface")
 
     diffuse_node = None
+    basemap_node = None
     ao_node = None
     sss_node = None
     thickness_node = None
@@ -962,14 +1032,20 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal
     micronormal_node = None
     micronormalmask_node = None
 
+    gltf_settings_node = None
     gltf_node = None
+    split_node = None
 
     micro_mix_node = None
     micro_mapping_node = None
     micro_texcoord_node = None
     micro_mask_mult_node = None
 
-    nodes.remove(shader_node)
+    mask_node = None
+    detail_node = None
+
+    if shader_node:
+        nodes.remove(shader_node)
 
     for node in nodes:
         if node != bsdf_node and node != output_node:
@@ -978,6 +1054,8 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal
                     diffuse_node = node
                 elif node.name.endswith("_AO"):
                     ao_node = node
+                elif node.name.endswith("_BaseMap"):
+                    basemap_node = node
                 elif node.name.endswith("_Subsurface"):
                     sss_node = node
                 elif node.name.endswith("_Thickness"):
@@ -1002,15 +1080,48 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal
                     micronormalmask_node = node
                 elif node.name.endswith("_Bump"):
                     bump_node = node
+                elif node.name.endswith("_GLTF"):
+                    gltf_node = node
+                elif node.name.endswith("_Mask"):
+                    mask_node = node
+                elif node.name.endswith("_Detail"):
+                    detail_node = node
             else:
                 nodes.remove(node)
+
+    if props.target_mode == "GLTF" and props.pack_gltf:
+        if diffuse_node:
+            nodes.remove(diffuse_node)
+            diffuse_node = None
+        if ao_node:
+            nodes.remove(ao_node)
+            ao_node = None
+        if roughness_node:
+            nodes.remove(roughness_node)
+            roughness_node = None
+        if metallic_node:
+            nodes.remove(metallic_node)
+            metallic_node = None
+        if basemap_node:
+            nodeutils.link_nodes(links, basemap_node, "Color", bsdf_node, "Base Color")
+            if alpha_node:
+                nodeutils.link_nodes(links, basemap_node, "Alpha", bsdf_node, "Alpha")
+                nodes.remove(alpha_node)
+                alpha_node = None
+        if gltf_node:
+            gltf_settings_node = nodeutils.make_gltf_settings_node(nodes)
+            split_node = nodeutils.make_shader_node(nodes, "ShaderNodeSeparateRGB")
+            nodeutils.link_nodes(links, gltf_node, "Color", split_node, "Image")
+            nodeutils.link_nodes(links, split_node, "R", gltf_settings_node, "Occlusion")
+            nodeutils.link_nodes(links, split_node, "G", bsdf_node, "Roughness")
+            nodeutils.link_nodes(links, split_node, "B", bsdf_node, "Metallic")
 
     if diffuse_node and ao_node:
 
         if props.target_mode == "GLTF":
             nodeutils.link_nodes(links, diffuse_node, "Color", bsdf_node, "Base Color")
-            gltf_node = nodeutils.make_gltf_settings_node(nodes)
-            nodeutils.link_nodes(links, ao_node, "Color", gltf_node, "Occlusion")
+            gltf_settings_node = nodeutils.make_gltf_settings_node(nodes)
+            nodeutils.link_nodes(links, ao_node, "Color", gltf_settings_node, "Occlusion")
         else:
             mix_node = nodeutils.make_mixrgb_node(nodes, "MULTIPLY")
             nodeutils.set_node_input(mix_node, "Fac", ao_strength)
@@ -1072,10 +1183,23 @@ def reconnect_material(mat, ao_strength, sss_radius, bump_distance, micro_normal
         nodeutils.link_nodes(links, micronormal_node, "Color", micro_mix_node, "Color2")
         nodeutils.link_nodes(links, micro_mix_node, "Color", normal_map_node, "Color")
 
+    position(bsdf_node, (200, 400))
+    position(output_node, (600, 400))
+
     position(diffuse_node, (-600, 600))
     position(ao_node, (-900, 600))
     position(mix_node, (-300, 600))
-    position(gltf_node, (-600, 700))
+
+    if props.target_mode == "GLTF" and props.pack_gltf:
+        position(basemap_node, (-600, 600))
+        position(gltf_node, (-900, 0))
+        position(split_node, (-600, 0))
+        position(gltf_settings_node, (200, 500))
+    else:
+        position(gltf_settings_node, (-600, 700))
+        position(basemap_node, (-1800, 600))
+        position(mask_node, (-1800, 300))
+        position(detail_node, (-1800, 0))
 
     position(sss_node, (-600, 300))
     position(thickness_node, (-900, 300))
@@ -1127,9 +1251,13 @@ def bake_selected_objects():
     bpy.context.scene.render.engine = 'CYCLES'
 
     materials_done = []
+    obj : bpy.types.Object
     for obj in objects:
         if obj.type == "MESH":
             bake_object(obj, bake_surface, materials_done)
+        elif obj.type == "ARMATURE":
+            for child in obj.children:
+                bake_object(child, bake_surface, materials_done)
     materials_done.clear()
 
     bpy.data.objects.remove(bake_surface)
@@ -1194,6 +1322,7 @@ def get_largest_texture_to_socket(node, socket, shader_node, done = None):
     if socket[-3:] == ":AO":
         connected_node = nodeutils.get_node_connected_to_input(node, socket[:-3])
         if connected_node.type == "MIX_RGB" and connected_node.blend_type == "MULTIPLY":
+            # TODO: Maybe filter for *.(ao|ambient|occlusion)
             return get_largest_texture_to_socket(connected_node, "Color2", shader_node, done)
 
     elif socket[-8:] == ":DIFFUSE":
@@ -1399,7 +1528,7 @@ def bake_object(obj, bake_surface, materials_done):
 
         else:
             # if the material has already been baked elsewhere, replace the material here
-            if bake_cache:
+            if bake_cache and slot.material != bake_cache.baked_material:
                 slot.material = bake_cache.baked_material
 
 
@@ -1720,18 +1849,12 @@ class CC3BakePanel(bpy.types.Panel):
         col_2.prop(props, "target_mode", text="", slider = True)
         col_1.label(text="Bake Samples")
         col_2.prop(props, "bake_samples", text="", slider = True)
-        if props.target_mode != "UNITY_HDRP" and props.target_mode != "UNITY_URP":
-            col_1.label(text="Format")
-            col_2.prop(props, "target_format", text="", slider = True)
-            if props.target_format == "JPEG":
-                col_1.label(text="JPEG Quality")
-                col_2.prop(props, "jpeg_quality", text="", slider = True)
-        else:
-            layout.box().label(text = "Unity is PNG Only")
-            split = layout.split(factor=0.5)
-            col_1 = split.column()
-            col_2 = split.column()
-        if props.target_format == "PNG" or props.target_mode == "UNITY_HDRP":
+        col_1.label(text="Format")
+        col_2.prop(props, "target_format", text="", slider = True)
+        if props.target_format == "JPEG":
+            col_1.label(text="JPEG Quality")
+            col_2.prop(props, "jpeg_quality", text="", slider = True)
+        if props.target_format == "PNG":
             col_1.label(text="PNG Compression")
             col_2.prop(props, "png_compression", text="", slider = True)
         col_1.label(text="Max Size")
@@ -1740,13 +1863,16 @@ class CC3BakePanel(bpy.types.Panel):
         #col_2.prop(props, "scale_maps", text="")
         if "Bump" in bake_maps:
             col_1.label(text="Allow Bump Maps")
-            col_2.prop(props, "allow_bump_maps", text="", slider = True)
+            col_2.prop(props, "allow_bump_maps", text="")
         if "AO" in bake_maps:
             col_1.label(text="AO in Diffuse")
             col_2.prop(props, "ao_in_diffuse", text="", slider = True)
         if props.target_mode == "UNITY_HDRP" or props.target_mode == "UNITY_URP":
             col_1.label(text="Smoothness Mapping")
-            col_2.prop(props, "smoothness_mapping", text="", slider = True)
+            col_2.prop(props, "smoothness_mapping", text="")
+        if props.target_mode == "GLTF":
+            col_1.label(text="Pack GLTF")
+            col_2.prop(props, "pack_gltf", text="")
         col_1.label(text="Bake Folder")
         col_2.prop(props, "bake_path", text="")
         col_1.separator()
@@ -1864,13 +1990,14 @@ class CC3BakeProps(bpy.types.PropertyGroup):
 
     target_format: bpy.props.EnumProperty(items=vars.TARGET_FORMATS, default="JPEG")
 
-    bake_samples: bpy.props.IntProperty(default=5, min=1, max=64)
-    ao_in_diffuse: bpy.props.FloatProperty(default=0, min=0, max=1, description="How much of the ambient occlusion to bake into the diffuse.")
+    bake_samples: bpy.props.IntProperty(default=5, min=1, max=64, description="The number of texture samples per pixel to bake. As there are no ray traced effects involved, 1 to 5 samples is usually enough.")
+    ao_in_diffuse: bpy.props.FloatProperty(default=0, min=0, max=1, description="How much of the ambient occlusion to bake into the diffuse")
 
-    smoothness_mapping: bpy.props.EnumProperty(items=vars.CONVERSION_FUNCTIONS, default="IR", description="Roughness to smoothness calculation.")
+    smoothness_mapping: bpy.props.EnumProperty(items=vars.CONVERSION_FUNCTIONS, default="IR", description="Roughness to smoothness calculation")
 
-    allow_bump_maps: bpy.props.BoolProperty(default=True)
+    allow_bump_maps: bpy.props.BoolProperty(default=True, description="Allow separate Bump and Normal Maps")
     scale_maps: bpy.props.BoolProperty(default=False)
+    pack_gltf: bpy.props.BoolProperty(default=True, description="Pack AO, Roughness and Metallic into a single Texture for GLTF")
 
     custom_sizes: bpy.props.BoolProperty(default=False)
     max_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="4096")

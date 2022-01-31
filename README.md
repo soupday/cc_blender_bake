@@ -5,7 +5,15 @@ https://youtu.be/RzVxKjc1AWU
 
 Currently requires CC3 Blender Tools version **1.1.6** [Link](https://github.com/soupday/cc3_blender_tools)
 
+Links
+=====
+[CC3/iClone Blender Tools](https://github.com/soupday/cc3_blender_tools)
+[CC3 Round-trip Import Plugin](https://github.com/soupday/CC3-Blender-Tools-Plugin)
+
 ## Changelog
+### 1.0.3
+- Fixed a crash invoking Baking operator from script.
+
 ### 1.0.2
 - Fixed a crash issue in Blender 2.93 when changing image file format.
 - Keeps and restores normal strength in baked materials.

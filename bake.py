@@ -1248,8 +1248,11 @@ def bake_selected_objects():
     # use mesh geometry this means we can bake the entirety of the textures with an even sampling.
 
     # go into wireframe mode:
-    shading = bpy.context.space_data.shading.type
-    bpy.context.space_data.shading.type = 'WIREFRAME'
+    try:
+        shading = bpy.context.space_data.shading.type
+        bpy.context.space_data.shading.type = 'WIREFRAME'
+    except:
+        pass
     # set cycles bake
     engine = bpy.context.scene.render.engine
     bpy.context.scene.render.engine = 'CYCLES'
@@ -1267,7 +1270,10 @@ def bake_selected_objects():
     bpy.data.objects.remove(bake_surface)
 
     bpy.context.scene.render.engine = engine
-    bpy.context.space_data.shading.type = shading
+    try:
+        bpy.context.space_data.shading.type = shading
+    except:
+        pass
 
     # restore selection
     utils.try_select_objects(objects, True)

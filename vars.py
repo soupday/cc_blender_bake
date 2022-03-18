@@ -12,6 +12,7 @@ DEFAULT_SIZE = 1024
 
 BAKE_TARGETS = [
     ("BLENDER","Blender", "Bake textures for Blender. The baked textures should be more performant than the complex node materials"),
+    ("RL","Reallusion", "Bake textures for iClone / Character Creator"),
     ("SKETCHFAB","Sketchfab", "Bake and name the textures for Sketchfab. Uploading the baked textures with the .blend file to Sketchfab should auto connect the textures to the materials"),
     ("GLTF","GLTF", "Bake the relevant textures to be compatible with the GLTF exporter"),
     ("UNITY_HDRP","Unity HDRP","Bake and pack the textures for the Unity HDRP/Lit shader. Once baked only the BaseMap, Mask and Detail, Subsurface, Thickness and Emission textures are needed"),
@@ -41,9 +42,28 @@ def get_bake_target_maps(target):
         return UNITY_URP_MAPS
     elif target == "UNITY_HDRP":
         return UNITY_HDRP_MAPS
+    elif target == "RL":
+        return RL_MAPS
     return BLENDER_MAPS
 
 # global_suffix: ['target_suffix', 'prop_name']
+RL_MAPS = {
+    "Diffuse": ["Diffuse", "diffuse_size"],
+    "AO": ["AO", "ao_size"],
+    "Blend": ["BlendMultiply", "diffuse_size"],
+    "Subsurface": ["SSS", "sss_size"],
+    "Thickness": ["Transmission", "thickness_size"],
+    "Metallic": ["Metallic", "metallic_size"],
+    "Specular": ["Specular", "specular_size"],
+    "Roughness": ["Roughness", "roughness_size"],
+    "Emission": ["Emission", "emissive_size"],
+    "Alpha": ["Alpha", "alpha_size"],
+    "Normal": ["Normal", "normal_size"],
+    "Bump": ["Bump", "bump_size"],
+    "MicroNormal": ["MicroNormal", "micronormal_size"],
+    "MicroNormalMask": ["MicroNormalMask", "micronormalmask_size"],
+}
+
 BLENDER_MAPS = {
     "Diffuse": ["Diffuse", "diffuse_size"],
     "Subsurface": ["Subsurface", "sss_size"],
@@ -141,6 +161,10 @@ TEX_SIZE_DETECT = {
 
     "ao_size": [
         ["AO"], ["Base Color:AO"]
+    ],
+
+    "blend_size": [
+        ["BLEND1"], ["Base Color:BLEND"]
     ],
 
     "sss_size": [

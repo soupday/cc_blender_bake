@@ -11,6 +11,10 @@ Links
 [CC3 Round-trip Import Plugin](https://github.com/soupday/CC3-Blender-Tools-Plugin)
 
 ## Changelog
+
+### 1.0.4
+- Added Reallusion as a target to bake for.
+
 ### 1.0.3
 - Fixed a crash invoking Baking operator from script.
 

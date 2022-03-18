@@ -32,6 +32,14 @@ def is_connected(node : bpy.types.Node, socket):
         return node.inputs[socket].is_linked
 
 
+def is_mixer_connected(node : bpy.types.Node, socket):
+    mixer = get_node_connected_to_input(node, socket)
+    if mixer and mixer.type == "GROUP":
+        if NODE_PREFIX in mixer.name and "rl_mixer" in mixer.name:
+            return True
+    return False
+
+
 def get_sockets_connected_to_output(node, socket):
     try:
         sockets = []

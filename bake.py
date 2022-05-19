@@ -199,7 +199,6 @@ def prep_bake(width, height):
 
     props = bpy.context.scene.CC3BakeProps
 
-    bpy.context.scene.cycles.samples = props.bake_samples
     # blender 3.0
     if utils.check_blender_version("3.0.0"):
         bpy.context.scene.cycles.preview_samples = props.bake_samples
@@ -213,7 +212,11 @@ def prep_bake(width, height):
     bpy.context.scene.render.bake.use_selected_to_active = False
     bpy.context.scene.render.bake.use_pass_direct = False
     bpy.context.scene.render.bake.use_pass_indirect = False
-    bpy.context.scene.render.bake.target = 'IMAGE_TEXTURES'
+    try:
+        bpy.context.scene.cycles.samples = props.bake_samples
+        bpy.context.scene.render.bake.target = 'IMAGE_TEXTURES'
+    except:
+        pass
     bpy.context.scene.render.bake.margin = 1
     bpy.context.scene.render.bake.use_clear = True
     bpy.context.scene.render.image_settings.file_format = get_image_format()[0]
@@ -230,7 +233,10 @@ def post_bake():
     global old_samples, old_file_format, old_quality, old_compression
     global old_view_transform, old_look, old_gamma, old_exposure, old_colorspace
 
-    bpy.context.scene.cycles.samples = old_samples
+    try:
+        bpy.context.scene.cycles.samples = old_samples
+    except:
+        pass
 
     bpy.context.scene.render.image_settings.file_format = old_file_format
     bpy.context.scene.render.image_settings.quality = old_quality
@@ -1790,7 +1796,7 @@ class CC3BakePanel(bpy.types.Panel):
     bl_label = "Bake"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "CC3 Bake"
+    bl_category = "CC/iC Bake"
 
     def draw_size_props(self, context, props, bake_maps, col_1, col_2):
 
@@ -1968,7 +1974,7 @@ class CC3BakeUtilityPanel(bpy.types.Panel):
     bl_label = "Utilities"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "CC3 Bake"
+    bl_category = "CC/iC Bake"
     bl_options = {"DEFAULT_CLOSED"}
 
     def draw(self, context):

@@ -1,16 +1,22 @@
-# cc3_bake
+# CC/iC Blender Baking Tools
 
 What it automates:
 https://youtu.be/RzVxKjc1AWU
 
-Currently requires CC3 Blender Tools version **1.1.6** [Link](https://github.com/soupday/cc3_blender_tools)
+Currently requires CC/iC Blender Tools version **1.1.6** [Link](https://github.com/soupday/cc3_blender_tools)
 
 Links
 =====
-[CC3/iClone Blender Tools](https://github.com/soupday/cc3_blender_tools)
+[CC/iC Blender Tools](https://github.com/soupday/cc3_blender_tools)
+
 [CC3 Round-trip Import Plugin](https://github.com/soupday/CC3-Blender-Tools-Plugin)
 
+[CC4 Round-trip Import Plugin](https://github.com/soupday/CC4-Blender-Tools-Plugin)
+
 ## Changelog
+
+### 1.0.5
+-
 
 ### 1.0.4
 - Added Reallusion as a target to bake for.

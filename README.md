@@ -3,11 +3,11 @@
 What it automates:
 https://youtu.be/RzVxKjc1AWU
 
-Currently requires CC/iC Blender Tools version **1.1.6** [Link](https://github.com/soupday/cc3_blender_tools)
+Currently requires CC/iC Blender Tools version **1.1.6** or higher [Link](https://github.com/soupday/cc_blender_tools)
 
 Links
 =====
-[CC/iC Blender Tools](https://github.com/soupday/cc3_blender_tools)
+[CC/iC Blender Tools](https://github.com/soupday/cc_blender_tools)
 
 [CC3 Round-trip Import Plugin](https://github.com/soupday/CC3-Blender-Tools-Plugin)
 

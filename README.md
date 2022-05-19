@@ -16,7 +16,8 @@ Links
 ## Changelog
 
 ### 1.0.5
--
+- Blender version fix.
+- UI & Repository rename.
 
 ### 1.0.4
 - Added Reallusion as a target to bake for.

@@ -654,6 +654,9 @@ def bake_material(obj, mat, source_mat):
     if props.target_mode == "BLENDER":
         pass
 
+    elif props.target_mode == "GODOT":
+        pass
+
     elif props.target_mode == "SKETCHFAB":
         pass
 
@@ -1964,9 +1967,22 @@ class CC3BakePanel(bpy.types.Panel):
                 row = layout.row()
                 row.operator("cc3.bakesettings", icon="LOOP_BACK", text="Revert Source Materials").param = "SOURCE"
 
+        valid_bake_path = False
+        if os.path.isabs(props.bake_path) or bpy.data.is_saved:
+            valid_bake_path = True
+
+        layout.box().label(text="Select objects to bake", icon="INFO")
+
         row = layout.row()
         row.scale_y = 2
         row.operator("cc3.baker", icon="PLAY", text="Bake").param = "BAKE"
+        if not valid_bake_path:
+            row.enabled = False
+            box = layout.box()
+            box.alert = True
+            box.label(text="Warning:", icon="ERROR")
+            box.label(text="Bake path must be absolute")
+            box.label(text="Or relative to saved blend file")
 
 
 class CC3BakeUtilityPanel(bpy.types.Panel):

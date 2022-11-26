@@ -17,6 +17,7 @@ BAKE_TARGETS = [
     ("GLTF","GLTF", "Bake the relevant textures to be compatible with the GLTF exporter"),
     ("UNITY_HDRP","Unity HDRP","Bake and pack the textures for the Unity HDRP/Lit shader. Once baked only the BaseMap, Mask and Detail, Subsurface, Thickness and Emission textures are needed"),
     ("UNITY_URP","Unity 3D/URP","Bake the textures for Unity 3D Standard shader or for URP/Lit shader"),
+    ("GODOT","Godot Engine","Bake the textures to be compatible with Godot Blender Exporter add-on"),
 ]
 
 TARGET_FORMATS = [
@@ -44,6 +45,8 @@ def get_bake_target_maps(target):
         return UNITY_HDRP_MAPS
     elif target == "RL":
         return RL_MAPS
+    elif target == "GODOT":
+        return GODOT_MAPS
     return BLENDER_MAPS
 
 # global_suffix: ['target_suffix', 'prop_name']
@@ -77,6 +80,19 @@ BLENDER_MAPS = {
     "Bump": ["Bump", "bump_size"],
     "MicroNormal": ["MicroNormal", "micronormal_size"],
     "MicroNormalMask": ["MicroNormalMask", "micronormalmask_size"],
+}
+
+GODOT_MAPS = {
+    "Diffuse": ["Diffuse", "diffuse_size"],
+    "Subsurface": ["Subsurface", "sss_size"],
+    "Metallic": ["Metallic", "metallic_size"],
+    "Specular": ["Specular", "specular_size"],
+    "Roughness": ["Roughness", "roughness_size"],
+    "Emission": ["Emission", "emissive_size"],
+    "Alpha": ["Alpha", "alpha_size"],
+    "Transmission": ["Transmission", "transmission_size"],
+    "Normal": ["Normal", "normal_size"],
+    "Bump": ["Bump", "bump_size"],
 }
 
 SKETCHFAB_MAPS = {

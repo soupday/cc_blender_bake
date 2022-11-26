@@ -15,6 +15,9 @@ Links
 
 ## Changelog
 
+### 1.0.6
+- Added bake target for Godot engine to support the godot-blender-exporter add-on.
+
 ### 1.0.5
 - Blender version fix.
 - UI & Repository rename.

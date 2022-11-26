@@ -1,3 +1,5 @@
 
 cc3_blender_bake_updater/cc3_blender_bake_updater_status.json
 *.pyc
+cc3_bake_updater/cc3_bake_updater_status.json
+cc_blender_bake_updater/cc_blender_bake_updater_status.json

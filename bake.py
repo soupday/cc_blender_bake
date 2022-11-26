@@ -199,7 +199,6 @@ def prep_bake(width, height):
 
     props = bpy.context.scene.CC3BakeProps
 
-    bpy.context.scene.cycles.samples = props.bake_samples
     # blender 3.0
     if utils.check_blender_version("3.0.0"):
         bpy.context.scene.cycles.preview_samples = props.bake_samples
@@ -213,7 +212,11 @@ def prep_bake(width, height):
     bpy.context.scene.render.bake.use_selected_to_active = False
     bpy.context.scene.render.bake.use_pass_direct = False
     bpy.context.scene.render.bake.use_pass_indirect = False
-    bpy.context.scene.render.bake.target = 'IMAGE_TEXTURES'
+    try:
+        bpy.context.scene.cycles.samples = props.bake_samples
+        bpy.context.scene.render.bake.target = 'IMAGE_TEXTURES'
+    except:
+        pass
     bpy.context.scene.render.bake.margin = 1
     bpy.context.scene.render.bake.use_clear = True
     bpy.context.scene.render.image_settings.file_format = get_image_format()[0]
@@ -230,7 +233,10 @@ def post_bake():
     global old_samples, old_file_format, old_quality, old_compression
     global old_view_transform, old_look, old_gamma, old_exposure, old_colorspace
 
-    bpy.context.scene.cycles.samples = old_samples
+    try:
+        bpy.context.scene.cycles.samples = old_samples
+    except:
+        pass
 
     bpy.context.scene.render.image_settings.file_format = old_file_format
     bpy.context.scene.render.image_settings.quality = old_quality
@@ -388,6 +394,15 @@ def prep_alpha(mat, shader_node):
     return
 
 
+def can_bake_shader_node(shader_node, bsdf_node, bsdf_socket):
+    props = bpy.context.scene.CC3BakeProps
+    if shader_node is None:
+        return False
+    if nodeutils.is_mixer_connected(bsdf_node, bsdf_socket):
+        return not props.bake_mixers
+    return nodeutils.get_node_connected_to_input(bsdf_node, bsdf_socket) == shader_node
+
+
 def bake_material(obj, mat, source_mat):
     props = bpy.context.scene.CC3BakeProps
     nodes = mat.node_tree.nodes
@@ -407,7 +422,7 @@ def bake_material(obj, mat, source_mat):
     ao_bake_node = None
     ao_strength = 1.0
     if nodeutils.is_connected(bsdf_node, "Base Color"):
-        if shader_node:
+        if can_bake_shader_node(shader_node, bsdf_node, "Base Color"):
             # if the shader_node does not have an "AO" output node, then copy the AO texture directly.
             # note: so far, nothing has an "AO" output node.
             if "AO" in bake_maps:
@@ -435,7 +450,7 @@ def bake_material(obj, mat, source_mat):
     if nodeutils.is_connected(bsdf_node, "Subsurface"):
         if "Subsurface" in bake_maps:
             sss_radius = prep_sss(mat, shader_node)
-            if shader_node:
+            if can_bake_shader_node(shader_node, bsdf_node, "Subsurface"):
                 sss_bake_node = bake_socket_output(source_mat, mat, shader_node, "Subsurface", "Subsurface")
             elif bsdf_node:
                 sss_bake_node = bake_socket_input(source_mat, mat, bsdf_node, "Subsurface", "Subsurface")
@@ -455,7 +470,7 @@ def bake_material(obj, mat, source_mat):
     if nodeutils.is_connected(bsdf_node, "Metallic"):
         if "Metallic" in bake_maps:
             utils.log_info("Processing Metallic")
-            if shader_node:
+            if can_bake_shader_node(shader_node, bsdf_node, "Metallic"):
                 metallic_bake_node = bake_socket_output(source_mat, mat, shader_node, "Metallic", "Metallic")
             elif bsdf_node:
                 metallic_bake_node = bake_socket_input(source_mat, mat, bsdf_node, "Metallic", "Metallic")
@@ -465,7 +480,7 @@ def bake_material(obj, mat, source_mat):
     if nodeutils.is_connected(bsdf_node, "Specular"):
         if "Specular" in bake_maps:
             utils.log_info("Processing Specular")
-            if shader_node:
+            if can_bake_shader_node(shader_node, bsdf_node, "Specular"):
                 specular_bake_node = bake_socket_output(source_mat, mat, shader_node, "Specular", "Specular")
             elif bsdf_node:
                 specular_bake_node = bake_socket_input(source_mat, mat, bsdf_node, "Specular", "Specular")
@@ -480,7 +495,7 @@ def bake_material(obj, mat, source_mat):
     if nodeutils.is_connected(bsdf_node, "Roughness"):
         if "Roughness" in bake_maps:
             utils.log_info("Processing Roughness")
-            if shader_node:
+            if can_bake_shader_node(shader_node, bsdf_node, "Roughness"):
                 roughnesss_bake_node = bake_socket_output(source_mat, mat, shader_node, "Roughness", "Roughness")
             elif bsdf_node:
                 roughnesss_bake_node = bake_socket_input(source_mat, mat, bsdf_node, "Roughness", "Roughness")
@@ -493,7 +508,10 @@ def bake_material(obj, mat, source_mat):
             utils.log_info("Processing Emission")
             emission_node = nodeutils.find_shader_texture(nodes, "EMISSION")
             if emission_node:
-                emission_bake_node = bake_socket_output(source_mat, mat, emission_node, "Color", "Emission")
+                if can_bake_shader_node(shader_node, bsdf_node, "Emission"):
+                    emission_bake_node = bake_socket_output(source_mat, mat, emission_node, "Color", "Emission")
+                elif bsdf_node:
+                    emission_bake_node = bake_socket_input(source_mat, mat, bsdf_node, "Emission", "Emission")
 
     # Alpha Maps
     alpha_bake_node = None
@@ -501,7 +519,8 @@ def bake_material(obj, mat, source_mat):
         if ((mat.blend_method != "OPAQUE" and "Alpha" in bake_maps) or
             (shader_node and "Opacity" in shader_node.outputs and "Alpha" in bake_maps)):
             prep_alpha(mat, shader_node)
-            if shader_node:
+            if (can_bake_shader_node(shader_node, bsdf_node, "Alpha")
+                or (shader_node and "Opacity" in shader_node.outputs)):
                 if "Opacity" in shader_node.outputs:
                     alpha_bake_node = bake_socket_output(source_mat, mat, shader_node, "Opacity", "Alpha")
                     mat.blend_method = "BLEND"
@@ -515,7 +534,7 @@ def bake_material(obj, mat, source_mat):
     transmission_bake_node = None
     if nodeutils.is_connected(bsdf_node, "Transmission"):
         if "Transmission" in bake_maps:
-            if shader_node:
+            if can_bake_shader_node(shader_node, bsdf_node, "Transmission"):
                 transmission_bake_node = bake_socket_output(source_mat, mat, shader_node, "Transmission", "Transmission")
             elif bsdf_node:
                 transmission_bake_node = bake_socket_input(source_mat, mat, bsdf_node, "Transmission", "Transmission")
@@ -526,7 +545,7 @@ def bake_material(obj, mat, source_mat):
     bump_distance = 0.01
     if nodeutils.is_connected(bsdf_node, "Normal"):
         if "Bump" in bake_maps and props.allow_bump_maps:
-            if shader_node:
+            if can_bake_shader_node(shader_node, bsdf_node, "Normal"):
                 bump_node = nodeutils.find_shader_texture(nodes, "BUMP")
                 bump_distance = nodeutils.get_node_input(shader_node, "Bump Strength", 0.01)
                 if bump_node:
@@ -550,7 +569,7 @@ def bake_material(obj, mat, source_mat):
         if "Normal" in bake_maps:
             if "Bump" not in bake_maps or not props.allow_bump_maps:
                 bump_to_normal = True
-            if shader_node:
+            if can_bake_shader_node(shader_node, bsdf_node, "Normal"):
                 normal_strength = nodeutils.get_node_input(shader_node, "Normal Strength", 1.0)
                 if "Blend Normal" in shader_node.outputs:
                     normal_strength = 1.0
@@ -633,6 +652,9 @@ def bake_material(obj, mat, source_mat):
     utils.log_info("")
 
     if props.target_mode == "BLENDER":
+        pass
+
+    elif props.target_mode == "GODOT":
         pass
 
     elif props.target_mode == "SKETCHFAB":
@@ -1777,7 +1799,7 @@ class CC3BakePanel(bpy.types.Panel):
     bl_label = "Bake"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "CC3 Bake"
+    bl_category = "CC/iC Bake"
 
     def draw_size_props(self, context, props, bake_maps, col_1, col_2):
 
@@ -1876,8 +1898,8 @@ class CC3BakePanel(bpy.types.Panel):
             col_2.prop(props, "png_compression", text="", slider = True)
         col_1.label(text="Max Size")
         col_2.prop(props, "max_size", text="")
-        #col_1.label(text="Scale Maps")
-        #col_2.prop(props, "scale_maps", text="")
+        col_1.label(text="Bake Mixers")
+        col_2.prop(props, "bake_mixers", text="")
         if "Bump" in bake_maps:
             col_1.label(text="Allow Bump Maps")
             col_2.prop(props, "allow_bump_maps", text="")
@@ -1945,9 +1967,22 @@ class CC3BakePanel(bpy.types.Panel):
                 row = layout.row()
                 row.operator("cc3.bakesettings", icon="LOOP_BACK", text="Revert Source Materials").param = "SOURCE"
 
+        valid_bake_path = False
+        if os.path.isabs(props.bake_path) or bpy.data.is_saved:
+            valid_bake_path = True
+
+        layout.box().label(text="Select objects to bake", icon="INFO")
+
         row = layout.row()
         row.scale_y = 2
         row.operator("cc3.baker", icon="PLAY", text="Bake").param = "BAKE"
+        if not valid_bake_path:
+            row.enabled = False
+            box = layout.box()
+            box.alert = True
+            box.label(text="Warning:", icon="ERROR")
+            box.label(text="Bake path must be absolute")
+            box.label(text="Or relative to saved blend file")
 
 
 class CC3BakeUtilityPanel(bpy.types.Panel):
@@ -1955,7 +1990,7 @@ class CC3BakeUtilityPanel(bpy.types.Panel):
     bl_label = "Utilities"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "CC3 Bake"
+    bl_category = "CC/iC Bake"
     bl_options = {"DEFAULT_CLOSED"}
 
     def draw(self, context):
@@ -2017,6 +2052,7 @@ class CC3BakeProps(bpy.types.PropertyGroup):
     pack_gltf: bpy.props.BoolProperty(default=True, description="Pack AO, Roughness and Metallic into a single Texture for GLTF")
 
     custom_sizes: bpy.props.BoolProperty(default=False)
+    bake_mixers: bpy.props.BoolProperty(default=True, description="Bake the result of any Color ID/RGB mask mixers on the materials")
     max_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="4096")
     diffuse_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")
     ao_size: bpy.props.EnumProperty(items=vars.TEX_LIST, default="2048")

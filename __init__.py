@@ -18,15 +18,15 @@ from . import prefs
 from . import bake
 
 bl_info = {
-    "name": "CC3 Bake",
+    "name": "CC/iC Baking Tool",
     "author": "Victor Soupday",
-    "version": (1, 0, 3),
+    "version": (1, 0, 6),
     "blender": (2, 80, 0),
     "category": "Character",
-    "location": "3D View > Properties> CC3 Bake",
+    "location": "3D View > Properties > CC/iC Bake",
     "description": "Baking and stuff.",
-    "wiki_url": "https://soupday.github.io/cc3_blender_bake/index.html",
-    "tracker_url": "https://github.com/soupday/cc3_blender_bake/issues",
+    "wiki_url": "https://soupday.github.io/cc_blender_bake/index.html",
+    "tracker_url": "https://github.com/soupday/cc_blender_bake/issues",
 }
 
 vars.set_version_string(bl_info)
